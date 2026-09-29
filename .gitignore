@@ -29,3 +29,12 @@ dashboard/dist/
 .DS_Store
 .idea/
 .vscode/
+
+!data/sample/
+!data/sample/transactions_mini.csv
+
+!data/sample/
+!data/sample/transactions_mini.csv
+
+!data/sample/
+!data/sample/transactions_mini.csv
