@@ -1,0 +1,7 @@
+# Versions used to train this model in Google Colab.
+# xgboost is confirmed from the saved model file. Pin the others by running
+# the version cell in the notebook and replacing the lines below.
+xgboost==3.4.1
+scikit-learn==1.6.1
+pandas==2.2.3
+numpy==2.1.3
