@@ -1,0 +1,31 @@
+﻿# data and model artifacts (tracked with DVC / MLflow, not Git)
+data/*
+!data/.gitkeep
+models/*
+!models/.gitkeep
+*.csv
+*.csv.gz
+*.parquet
+*.joblib
+*.pt
+*.pkl
+
+# secrets and environment
+.env
+.venv/
+venv/
+
+# python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# frontend
+node_modules/
+dashboard/build/
+dashboard/dist/
+
+# os / editor
+.DS_Store
+.idea/
+.vscode/
