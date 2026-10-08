@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fraud Agent Call Demo</title>
+<style>
+:root{
+  --bg:#f4f5f7; --panel:#ffffff; --ink:#15171c; --muted:#646b78; --line:#e2e5ea;
+  --accent:#4b3fd6; --accent-ink:#ffffff; --good:#15803d; --good-bg:#e8f6ed;
+  --bad:#b42318; --bad-bg:#fdecea; --warn:#a15c00; --warn-bg:#fff4e0;
+  --phone:#0f1115; --phone-ink:#f2f3f5; --bubble-agent:#262a33; --bubble-cust:#4b3fd6;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#0e1014; --panel:#171a20; --ink:#eceef2; --muted:#9aa1ad; --line:#2a2f38;
+    --accent:#7d73ff; --good:#4ade80; --good-bg:#11271a; --bad:#f87171; --bad-bg:#2c1414;
+    --warn:#fbbf24; --warn-bg:#2b2110; --phone:#050608; --bubble-agent:#20242c; }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif}
+header{padding:18px 24px 6px}
+header h1{margin:0;font-size:20px}
+header p{margin:2px 0 0;color:var(--muted);font-size:13px}
+main{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:20px;padding:14px 24px 24px;align-items:start}
+@media (max-width:900px){main{grid-template-columns:1fr;padding:12px 16px}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px}
+.card h2{margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+select,input[type=text]{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);min-width:0}
+select{flex:1 1 320px}
+button{font:inherit;font-weight:600;padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+button:disabled{opacity:.5;cursor:default}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;border-radius:0}
+.seg button.on{background:var(--accent);color:var(--accent-ink)}
+.kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px 16px}
+.kv div span{display:block;font-size:12px;color:var(--muted)}
+.kv div b{font-weight:600;word-break:break-all}
+ol.steps{list-style:none;margin:0;padding:0}
+ol.steps li{display:flex;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
+ol.steps li:first-child{border-top:0}
+.dot{flex:0 0 22px;height:22px;border-radius:50%;background:var(--bg);border:1px solid var(--line);display:grid;place-items:center;font-size:12px}
+.steps small{display:block;color:var(--muted);word-break:break-word}
+.approval{border:2px solid var(--warn);background:var(--warn-bg)}
+.approval .act{font-size:18px;font-weight:700;margin:2px 0 6px}
+.badge{display:inline-block;padding:3px 10px;border-radius:999px;font-weight:700;font-size:13px}
+.b-FRAUD{background:var(--bad-bg);color:var(--bad)}
+.b-LEGITIMATE{background:var(--good-bg);color:var(--good)}
+.b-UNCERTAIN{background:var(--warn-bg);color:var(--warn)}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:600px){.cols{grid-template-columns:1fr}}
+.cols ul{margin:4px 0 0;padding-left:18px}
+.muted{color:var(--muted)}
+.err{color:var(--bad);white-space:pre-wrap}
+.hidden{display:none!important}
+
+/* phone */
+.phone{position:sticky;top:14px;background:var(--phone);color:var(--phone-ink);border-radius:38px;padding:18px 14px;height:720px;max-height:calc(100vh - 40px);display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(0,0,0,.25);border:6px solid #2a2d33}
+@media (max-width:900px){.phone{position:static;height:600px}}
+.notch{width:110px;height:22px;background:#000;border-radius:0 0 14px 14px;margin:-18px auto 10px}
+.ph-top{text-align:center;padding:6px 0 12px}
+.ph-top .who{font-size:20px;font-weight:600}
+.ph-top .st{font-size:13px;opacity:.7}
+.avatar{width:72px;height:72px;border-radius:50%;margin:8px auto;background:#2b2f38;display:grid;place-items:center;font-size:30px}
+.ringing .avatar{animation:pulse 1s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(125,115,255,.6)}100%{box-shadow:0 0 0 22px rgba(125,115,255,0)}}
+.transcript{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:4px 2px}
+.bubble{max-width:85%;padding:8px 12px;border-radius:16px;font-size:14px;line-height:1.45}
+.bubble.agent{background:var(--bubble-agent);align-self:flex-start;border-bottom-left-radius:4px}
+.bubble.cust{background:var(--bubble-cust);align-self:flex-end;border-bottom-right-radius:4px}
+.bubble.sys{align-self:center;background:none;opacity:.6;font-size:12px;text-align:center}
+.bubble.interim{opacity:.6;font-style:italic}
+.ph-controls{padding-top:10px}
+.callbtns{display:flex;justify-content:center;gap:40px;padding:10px 0}
+.round{width:64px;height:64px;border-radius:50%;border:0;font-size:24px;color:#fff}
+.accept{background:#22c55e}.decline{background:#ef4444}.mic{background:#3a3f4a}
+.mic.listening{background:#22c55e;animation:pulse 1s infinite}
+.typein{display:flex;gap:6px}
+.typein input{flex:1;background:#1c1f26;border-color:#2e333d;color:#fff}
+.typein button{background:#2e333d;color:#fff;border-color:#2e333d}
+.hint{font-size:11px;opacity:.55;text-align:center;margin-top:6px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Fraud investigation agent: live call demo</h1>
+  <p id="modelLine">Analyst console on the left, the customer's phone on the right.</p>
+</header>
+
+<main>
+<section>
+  <div class="card">
+    <h2>Start an investigation</h2>
+    <div class="row">
+      <select id="alertSel"><option>Loading test alerts…</option></select>
+      <input id="customId" type="text" placeholder="or type a txn id" style="width:170px">
+    </div>
+    <div class="row" style="margin-top:10px">
+      <span class="muted">Call language</span>
+      <div class="seg" id="langSeg">
+        <button data-lang="English" class="on">English</button>
+        <button data-lang="Arabic">العربية</button>
+      </div>
+      <label class="muted"><input type="checkbox" id="showKey"> show answer key in list</label>
+      <span style="flex:1"></span>
+      <button class="primary" id="startBtn">Start investigation</button>
+    </div>
+  </div>
+
+  <div class="card hidden" id="txnCard"><h2>Flagged transaction</h2><div class="kv" id="txnKv"></div></div>
+
+  <div class="card hidden" id="stepsCard"><h2>Agent steps</h2><ol class="steps" id="steps"></ol></div>
+
+  <div class="card approval hidden" id="approvalCard">
+    <h2 style="color:var(--warn)">Analyst approval needed</h2>
+    <div class="act" id="apAction"></div>
+    <div id="apReason"></div>
+    <div class="row" style="margin-top:12px">
+      <button class="primary" id="apYes">Approve and execute</button>
+      <button id="apNo">Reject</button>
+    </div>
+  </div>
+
+  <div class="card hidden" id="caseCard"><h2>Case file</h2><div id="caseBody"></div></div>
+  <div class="card hidden" id="errCard"><h2>Error</h2><div class="err" id="errText"></div></div>
+</section>
+
+<aside>
+  <div class="phone" id="phone">
+    <div class="notch"></div>
+    <div class="ph-top">
+      <div class="avatar">🏦</div>
+      <div class="who" id="phWho">No call</div>
+      <div class="st" id="phSt">Waiting for the agent</div>
+    </div>
+    <div class="transcript" id="transcript"></div>
+    <div class="ph-controls">
+      <div class="callbtns hidden" id="ringBtns">
+        <button class="round decline" id="declineBtn" title="Decline">✕</button>
+        <button class="round accept" id="acceptBtn" title="Answer">✆</button>
+      </div>
+      <div id="inCallCtl" class="hidden">
+        <div class="callbtns">
+          <button class="round mic" id="micBtn" title="Speak">🎙</button>
+          <button class="round decline" id="hangBtn" title="Hang up">✕</button>
+        </div>
+        <div class="typein"><input id="typeIn" type="text" dir="auto" placeholder="…or type the reply"><button id="typeSend">Send</button></div>
+        <div class="hint" id="micHint">The agent listens after it speaks. Tap 🎙 to answer again.</div>
+      </div>
+    </div>
+  </div>
+</aside>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+let lang = "English", lastSeq = 0, polling = false, alertsCache = [];
+let inCall = false, awaitingCustomer = false, callStart = 0, timerId = null;
+let audioCtx = null, ringStop = null, recog = null;
+
+const CODES = {English: "en-US", Arabic: "ar-SA"};
+let speechCode = "en-US";
+const STEP = {
+  get_transaction: ["📄", "Read the flagged transaction"],
+  get_account_history: ["📊", "Checked the account's 90-day history"],
+  get_device_links: ["📱", "Checked which accounts use this device"],
+  call_customer: ["📞", "Spoke to the customer"],
+  end_call: ["📴", "Ended the call"],
+  propose_action: ["🛡", "Proposed an action"]
+};
+
+// ------------------------------------------------------------ setup
+async function loadAlerts(){
+  const r = await fetch("/api/alerts"); alertsCache = await r.json(); drawAlerts();
+}
+function drawAlerts(){
+  const key = $("showKey").checked;
+  $("alertSel").innerHTML = alertsCache.map(a =>
+    `<option value="${a.txn_id}">${a.txn_id} · ${a.amount_sar.toLocaleString()} SAR · ${a.channel}${a.merchant ? " · " + esc(a.merchant) : ""}${key ? "  [" + a.answer_key + "]" : ""}</option>`).join("");
+}
+$("showKey").onchange = drawAlerts;
+document.querySelectorAll("#langSeg button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("#langSeg button").forEach(x => x.classList.remove("on"));
+  b.classList.add("on"); lang = b.dataset.lang;
+});
+
+$("startBtn").onclick = async () => {
+  audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+  speechSynthesis.getVoices();
+  const txn_id = $("customId").value.trim() || $("alertSel").value;
+  resetUI();
+  const r = await fetch("/api/start", {method:"POST", headers:{"Content-Type":"application/json"},
+                                      body: JSON.stringify({txn_id, language: lang})});
+  if (!r.ok){ showErr((await r.json()).detail || "Could not start."); return; }
+  $("startBtn").disabled = true; lastSeq = 0; poll();
+};
+
+function resetUI(){
+  ["txnCard","stepsCard","approvalCard","caseCard","errCard"].forEach(id => $(id).classList.add("hidden"));
+  $("steps").innerHTML = ""; $("transcript").innerHTML = "";
+  endCall(false); $("phWho").textContent = "No call"; $("phSt").textContent = "Waiting for the agent";
+}
+
+// ------------------------------------------------------------ event loop
+const queue = []; let working = false;
+async function poll(){
+  if (polling) return; polling = true;
+  while (true){
+    try{
+      const r = await fetch(`/api/events?since=${lastSeq}`); const d = await r.json();
+      for (const e of d.events){ lastSeq = e.seq + 1; queue.push(e); }
+      drain();
+      if (!d.running && !d.events.length && !queue.length && !working) break;
+    }catch(e){ /* server restarting; keep trying */ }
+    await sleep(500);
+  }
+  polling = false; $("startBtn").disabled = false;
+}
+async function drain(){
+  if (working) return; working = true;
+  while (queue.length){ await handle(queue.shift()); }
+  working = false;
+}
+
+async function handle(e){
+  switch (e.type){
+    case "started":
+      $("modelLine").textContent = `Model: ${e.model} (${e.provider}) · Investigating ${e.txn_id}`;
+      drawTxn(e.transaction); $("stepsCard").classList.remove("hidden"); break;
+    case "tool":
+      addStep(e.name, e.args); break;
+    case "notice":
+      addRaw("⏳", e.text); break;
+    case "call_turn":
+      await customerTurn(e); break;
+    case "call_end":
+      clearThinking();
+      if (inCall){ await say(e.bye.text, e.bye.audio); endCall(true); }
+      break;
+    case "customer_said": break;
+    case "approval":
+      $("apAction").textContent = e.action.replaceAll("_", " ");
+      $("apReason").textContent = e.reason;
+      $("approvalCard").classList.remove("hidden");
+      $("approvalCard").scrollIntoView({behavior:"smooth", block:"center"}); break;
+    case "approval_result":
+      addRaw(e.approved ? "✅" : "⛔", `${e.action.replaceAll("_"," ")} ${e.approved ? "approved and executed (mock core banking)" : "rejected by analyst"}`);
+      break;
+    case "tokens":
+      addRaw("🔢", `Tokens used: ${e.in.toLocaleString()} in, ${e.out.toLocaleString()} out`); break;
+    case "final":
+      clearThinking(); if (inCall) endCall(true);
+      drawCase(e); break;
+    case "error":
+      clearThinking(); if (inCall) endCall(true);
+      showErr(e.text); break;
+    case "truth":
+      drawTruth(e); break;
+  }
+}
+
+// ------------------------------------------------------------ the call
+let pendingTurn = false;   // the agent is waiting for this turn's answer
+async function customerTurn(e){
+  pendingTurn = true;
+  speechCode = e.code || CODES[lang];
+  clearThinking();
+  if (!inCall){
+    const answered = await ring();
+    if (!answered){ reply("__DECLINED__", true); return; }
+    startCall();
+    if (e.intro) await say(e.intro.text, e.intro.audio);
+  }
+  await say(e.text, e.audio);
+  if (!inCall) return;           // hung up while the agent was speaking
+  awaitingCustomer = true;
+  listen();
+}
+let thinkingBubble = null;
+function showThinking(){ clearThinking(); thinkingBubble = bubble("sys", "…"); }
+function clearThinking(){ if (thinkingBubble){ thinkingBubble.remove(); thinkingBubble = null; } }
+
+function ring(){
+  $("phone").classList.add("ringing");
+  $("phWho").textContent = "Bank Fraud Team"; $("phSt").textContent = "Incoming call…";
+  $("ringBtns").classList.remove("hidden");
+  ringStop = playRing();
+  return new Promise(res => {
+    $("acceptBtn").onclick = () => { stopRing(); res(true); };
+    $("declineBtn").onclick = () => { stopRing(); $("phSt").textContent = "Call declined"; res(false); };
+  });
+}
+function stopRing(){ if (ringStop) ringStop(); ringStop = null; $("ringBtns").classList.add("hidden"); $("phone").classList.remove("ringing"); }
+
+function startCall(){
+  inCall = true; callStart = Date.now();
+  $("inCallCtl").classList.remove("hidden");
+  timerId = setInterval(() => {
+    const s = Math.floor((Date.now() - callStart)/1000);
+    $("phSt").textContent = `On call · ${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
+  }, 500);
+}
+let currentAudio = null;
+function endCall(show){
+  if (recog) try{ recog.abort(); }catch(e){}
+  speechSynthesis.cancel(); stopRing();
+  if (currentAudio){ currentAudio.pause(); currentAudio = null; }
+  inCall = false; awaitingCustomer = false; clearInterval(timerId);
+  $("inCallCtl").classList.add("hidden");
+  if (show){ $("phSt").textContent = "Call ended"; bubble("sys", "Call ended"); }
+}
+$("hangBtn").onclick = () => {
+  const waiting = pendingTurn;
+  endCall(true);
+  if (waiting) reply("__HANGUP__", true);
+};
+
+function pickVoice(){
+  const code = speechCode, pre = code.slice(0,2);
+  const vs = speechSynthesis.getVoices().filter(v => v.lang.replace("_","-").toLowerCase().startsWith(pre));
+  const score = v => (v.lang.toLowerCase() === code.toLowerCase() ? 4 : 0) + (/natural|online|neural/i.test(v.name) ? 3 : 0) + (/google/i.test(v.name) ? 1 : 0);
+  return vs.sort((a,b) => score(b) - score(a))[0] || null;
+}
+function say(text, audioUrl){
+  bubble("agent", text);
+  if (audioUrl) return new Promise(res => {          // Gemini's voice
+    const a = new Audio(audioUrl); currentAudio = a;
+    let done = false; const fin = () => { if (!done){ done = true; currentAudio = null; res(); } };
+    a.onended = fin;
+    a.onpause = fin;                                  // also fires when the call is hung up
+    a.onerror = () => { if (!done){ done = true; browserSay(text).then(res); } };
+    a.play().catch(() => { if (!done){ done = true; browserSay(text).then(res); } });
+  });
+  return browserSay(text);
+}
+function browserSay(text){                           // fallback: the browser's own voice
+  if (!inCall) return Promise.resolve();
+  return new Promise(res => {
+    const u = new SpeechSynthesisUtterance(text);
+    const v = pickVoice(); if (v) u.voice = v;
+    u.lang = speechCode; u.rate = 1.0;
+    let done = false; const fin = () => { if (!done){ done = true; res(); } };
+    u.onend = fin; u.onerror = fin;
+    setTimeout(fin, 1500 + text.length * 110);  // safety net if the browser never fires onend
+    speechSynthesis.speak(u);
+  });
+}
+
+function listen(){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR){ $("micHint").textContent = "Speech recognition isn't available in this browser. Type the reply instead."; $("typeIn").focus(); return; }
+  if (recog) try{ recog.abort(); }catch(e){}
+  recog = new SR(); recog.lang = speechCode; recog.interimResults = true; recog.continuous = false;
+  let interim = null, finalText = "";
+  recog.onstart = () => $("micBtn").classList.add("listening");
+  recog.onresult = ev => {
+    let t = ""; finalText = "";
+    for (const r of ev.results){ if (r.isFinal) finalText += r[0].transcript; else t += r[0].transcript; }
+    if (!interim){ interim = bubble("cust interim", ""); }
+    interim.textContent = finalText || t;
+  };
+  recog.onend = () => {
+    $("micBtn").classList.remove("listening");
+    if (interim) interim.remove();
+    if (finalText.trim() && awaitingCustomer) reply(finalText.trim());
+    else if (awaitingCustomer) $("micHint").textContent = "Didn't catch that. Tap 🎙 and speak, or type the reply.";
+  };
+  recog.onerror = ev => { if (ev.error === "not-allowed") $("micHint").textContent = "Microphone blocked. Allow it in the address bar, or type the reply."; };
+  try{ recog.start(); }catch(e){}
+}
+$("micBtn").onclick = () => { if (awaitingCustomer) listen(); };
+$("typeSend").onclick = () => { const v = $("typeIn").value.trim(); if (v && awaitingCustomer){ $("typeIn").value = ""; reply(v); } };
+$("typeIn").onkeydown = e => { if (e.key === "Enter") $("typeSend").click(); };
+
+async function reply(text, silent){
+  awaitingCustomer = false; pendingTurn = false;
+  if (recog) try{ recog.abort(); }catch(e){}
+  if (!silent) bubble("cust", text);
+  if (inCall) showThinking();
+  $("micHint").textContent = "The agent listens after it speaks. Tap 🎙 to answer again.";
+  await fetch("/api/reply", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({value: text})});
+}
+
+function playRing(){
+  if (!audioCtx) return () => {};
+  let stopped = false;
+  const burst = () => {
+    if (stopped) return;
+    const g = audioCtx.createGain(); g.gain.value = 0.08; g.connect(audioCtx.destination);
+    const oscs = [440, 480].map(f => { const o = audioCtx.createOscillator(); o.frequency.value = f; o.connect(g); o.start(); return o; });
+    setTimeout(() => oscs.forEach(o => o.stop()), 1600);
+  };
+  burst(); const id = setInterval(burst, 3200);
+  return () => { stopped = true; clearInterval(id); };
+}
+
+// ------------------------------------------------------------ approvals
+$("apYes").onclick = () => approve(true);
+$("apNo").onclick = () => approve(false);
+async function approve(ok){
+  $("approvalCard").classList.add("hidden");
+  await fetch("/api/reply", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({value: ok})});
+}
+
+// ------------------------------------------------------------ drawing
+function drawTxn(t){
+  $("txnKv").innerHTML = [["Transaction", t.txn_id], ["Time", t.time], ["Amount", t.amount_sar.toLocaleString() + " SAR"],
+    ["Channel", t.channel], ["Merchant", t.merchant || "—"], ["City", t.city], ["Account", t.account]]
+    .map(([k,v]) => `<div><span>${k}</span><b>${esc(String(v))}</b></div>`).join("");
+  $("txnCard").classList.remove("hidden");
+}
+function addStep(name, args){
+  const [icon, label] = STEP[name] || ["•", name];
+  let detail = "";
+  if (name === "call_customer") detail = `“${args.question}”`;
+  else if (name === "propose_action") detail = `${args.action}: ${args.reason}`;
+  else detail = Object.values(args).join(" · ");
+  addRaw(icon, label, detail);
+}
+function addRaw(icon, label, detail){
+  const li = document.createElement("li");
+  li.innerHTML = `<span class="dot">${icon}</span><div>${esc(label)}${detail ? `<small dir="auto">${esc(detail)}</small>` : ""}</div>`;
+  $("steps").appendChild(li);
+}
+function bubble(kind, text){
+  const d = document.createElement("div"); d.className = "bubble " + kind; d.dir = "auto"; d.textContent = text;
+  $("transcript").appendChild(d); $("transcript").scrollTop = 1e9; return d;
+}
+function drawCase(e){
+  const c = e.case;
+  let h = "";
+  if (!c){ h = `<p class="muted">The model did not return a valid case file. Raw output:</p><pre style="white-space:pre-wrap">${esc(e.text)}</pre>`; }
+  else {
+    const list = a => (a && a.length) ? `<ul>${a.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : `<p class="muted">None</p>`;
+    h = `<div class="row"><span class="badge b-${esc(c.disposition)}">${esc(c.disposition)}</span>
+         <span class="muted">confidence ${Math.round((+c.confidence || 0) * 100)}%</span>
+         <b>${esc(c.suspected_pattern || "")}</b></div>
+         <p>${esc(c.summary || "")}</p>
+         <div class="cols"><div><b>Evidence for fraud</b>${list(c.evidence_for_fraud)}</div>
+         <div><b>Evidence against fraud</b>${list(c.evidence_against_fraud)}</div></div>
+         <p><b>Customer verification:</b> ${esc(c.customer_verification || "—")}</p>
+         <p><b>Action:</b> ${esc(c.action_taken || "—")}</p>`;
+  }
+  if (e.audit && e.audit.length){
+    h += `<p style="margin-bottom:4px"><b>Audit log</b></p><ul>` + e.audit.map(a =>
+      `<li>${esc(a.action)} · ${a.approved ? "approved, executed" : "rejected"}</li>`).join("") + `</ul>`;
+  }
+  h += `<div id="truthBox"></div>`;
+  $("caseBody").innerHTML = h; $("caseCard").classList.remove("hidden");
+  $("caseCard").scrollIntoView({behavior:"smooth", block:"start"});
+}
+function drawTruth(t){
+  const box = $("truthBox"); if (!box) return;
+  const truth = t.is_fraud ? `FRAUD (${t.fraud_type})` : "LEGITIMATE";
+  const disp = (document.querySelector("#caseBody .badge") || {}).textContent;
+  const match = disp ? ((disp === "FRAUD") === !!t.is_fraud && disp !== "UNCERTAIN") : null;
+  box.innerHTML = `<p style="margin-top:12px;padding-top:10px;border-top:1px solid var(--line)"><b>Answer key</b> (hidden from the agent): ${truth}
+    ${match === null ? "" : match ? ` <span class="badge b-LEGITIMATE">agent correct</span>` : ` <span class="badge b-FRAUD">agent wrong or unsure</span>`}</p>`;
+}
+function showErr(t){ $("errText").textContent = t; $("errCard").classList.remove("hidden"); }
+function esc(s){ return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+speechSynthesis.onvoiceschanged = () => {};
+loadAlerts();
+</script>
+</body>
+</html>

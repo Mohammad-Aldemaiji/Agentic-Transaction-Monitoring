@@ -33,12 +33,9 @@ dashboard/dist/
 !data/sample/
 !data/sample/transactions_mini.csv
 
-!data/sample/
-!data/sample/transactions_mini.csv
-
-!data/sample/
-!data/sample/transactions_mini.csv
-
 # E05 fraud model: small enough to keep in Git so the agent can load it
 !models/fraud_e05/
 !models/fraud_e05/*.pkl
+
+# agent voice cache
+tts_cache/

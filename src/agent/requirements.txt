@@ -1,0 +1,6 @@
+pandas
+pyarrow
+fastapi
+uvicorn
+google-genai
+anthropic
