@@ -42,3 +42,6 @@ tts_cache/
 
 # local voice files (download with piper.download_voices)
 src/agent/voices/
+
+# build caches
+*.tsbuildinfo
