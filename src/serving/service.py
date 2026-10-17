@@ -43,8 +43,23 @@ class Monitor:
         self.replay = Replay(self)
         db.init()
         self._requeue_unfinished()
-        for target in (self._analysis_worker, self._action_worker):
+        for target in (self._analysis_worker, self._action_worker, self._warm_up):
             threading.Thread(target=target, daemon=True).start()
+
+    def _warm_up(self):
+        """Load the language model and Whisper in the background at startup."""
+        from src.agent import voice
+        try:
+            print("Agent:", llm.warm_up())
+        except Exception as e:
+            print(f"Agent not ready: {e}")
+        try:
+            t = time.perf_counter()
+            with voice._stt_lock:
+                voice.load_whisper()
+            print(f"Speech recognition: Whisper {config.WHISPER_MODEL} loaded in {time.perf_counter() - t:.1f} s")
+        except Exception as e:
+            print(f"Speech recognition not ready: {type(e).__name__}: {e}")
 
     # ================================================================ ingest
     def ingest(self, txn_id: str = None, record: dict = None) -> dict:
@@ -142,8 +157,10 @@ class Monitor:
                 c.status = "AWAITING_APPROVAL"
             s.commit()
         if analysis:
+            u = analysis.get("_usage", {})
             self.event(case_id, "agent", "recommendation",
-                       f"Recommends: {ACTION_TEXT[analysis['recommended_action']]}. {analysis.get('recommendation_reason', '')}",
+                       f"Recommends: {ACTION_TEXT[analysis['recommended_action']]}. {analysis.get('recommendation_reason', '')} "
+                       f"({u.get('seconds', 0):.0f} s of model time over {u.get('steps', 0)} steps)",
                        {"disposition": analysis.get("disposition"), "confidence": analysis.get("confidence")})
         else:
             self.event(case_id, "system", "agent_error", f"Agent unavailable, decide manually. {error}")
@@ -237,7 +254,8 @@ class Monitor:
         self.event(case_id, "agent", "verification",
                    f"Customer confirms: {result['customer_confirms'].lower().replace('_', ' ')}. "
                    f"Signs of manipulation: {'yes' if result.get('signs_of_manipulation') else 'no'}. "
-                   f"Outcome: {ACTION_TEXT.get(result['outcome'], 'hand back to the analyst')}.",
+                   f"Outcome: {ACTION_TEXT.get(result['outcome'], 'hand back to the analyst')}. "
+                   f"({result.get('model_seconds') or 0:.0f} s of model time during the call)",
                    {"note": result.get("outcome_note")})
         if result["outcome"] == "ESCALATE":
             self._back_to_analyst(case_id, "Verification inconclusive; the analyst decides. "

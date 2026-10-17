@@ -183,7 +183,7 @@ function AgentPanel({ c, reload }: { c: CaseDetail; reload: () => void }) {
             <div><h3>Points to fraud</h3><ul>{a.evidence_for_fraud.map((x, i) => <li key={i}>{x}</li>)}</ul></div>
             <div><h3>Points against</h3><ul>{a.evidence_against_fraud.map((x, i) => <li key={i}>{x}</li>)}</ul></div>
           </div>
-          {a._usage && <p className="hint">{a._usage.steps} model steps, {a._usage.tools.length} look-ups, {a._usage.tokens_in.toLocaleString()} tokens read</p>}
+          {a._usage && <p className="hint">{a._usage.seconds != null && `${Math.round(a._usage.seconds)} s, `}{a._usage.steps} model steps, {a._usage.tools.length} look-ups, {a._usage.tokens_in.toLocaleString()} tokens read</p>}
         </>
       )}
       {err && <p className="error">{err}</p>}

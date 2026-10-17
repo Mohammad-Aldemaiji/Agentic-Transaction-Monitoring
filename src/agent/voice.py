@@ -9,6 +9,8 @@ import io
 import threading
 import wave
 
+import numpy as np
+
 from src import config
 
 LANGUAGES = {
@@ -68,14 +70,37 @@ def tts_status() -> dict:
                    "error": _tts_error.get(lang)} for lang, v in LANGUAGES.items()}
 
 
+def load_whisper():
+    """Load (and on first use, download) the Whisper model."""
+    global _whisper
+    if _whisper is None:
+        from faster_whisper import WhisperModel
+        compute = "int8" if config.WHISPER_DEVICE == "cpu" else "float16"
+        _whisper = WhisperModel(config.WHISPER_MODEL, device=config.WHISPER_DEVICE, compute_type=compute)
+    return _whisper
+
+
 def transcribe(audio: bytes, language: str) -> str:
     """Speech to text with faster-whisper on this machine."""
-    global _whisper
-    from faster_whisper import WhisperModel
     with _stt_lock:
-        if _whisper is None:
-            compute = "int8" if config.WHISPER_DEVICE == "cpu" else "float16"
-            _whisper = WhisperModel(config.WHISPER_MODEL, device=config.WHISPER_DEVICE, compute_type=compute)
-        segments, _ = _whisper.transcribe(io.BytesIO(audio), language=LANGUAGES[language]["whisper"],
-                                          beam_size=5, vad_filter=True)
+        load_whisper()
+        segments, _ = _whisper.transcribe(decode(audio), language=LANGUAGES[language]["whisper"],
+                                          beam_size=1, vad_filter=True)
         return " ".join(s.text.strip() for s in segments).strip()
+
+
+def decode(audio: bytes) -> np.ndarray:
+    """Browser recording (webm/opus, ogg, wav...) -> 16 kHz mono float32, which Whisper takes
+    directly. Done here rather than by faster-whisper, whose own decoder breaks with PyAV 15+."""
+    import av
+    out = []
+    with av.open(io.BytesIO(audio), mode="r") as container:
+        resampler = av.AudioResampler(format="s16", layout="mono", rate=16000)
+        for frame in container.decode(audio=0):
+            for f in resampler.resample(frame):
+                out.append(f.to_ndarray().reshape(-1))
+        for f in resampler.resample(None):  # flush what the resampler still holds
+            out.append(f.to_ndarray().reshape(-1))
+    if not out:
+        return np.zeros(0, dtype=np.float32)
+    return np.concatenate(out).astype(np.float32) / 32768.0

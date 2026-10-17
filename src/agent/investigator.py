@@ -173,7 +173,7 @@ def analyse(history, txn_id: str, model_result: dict,
     if parsed.get("recommended_action") not in ACTIONS:
         parsed["recommended_action"] = "VERIFY_WITH_CUSTOMER"
     parsed["_usage"] = {"tokens_in": usage.tokens_in, "tokens_out": usage.tokens_out,
-                        "steps": usage.steps, "tools": usage.tool_calls}
+                        "steps": usage.steps, "tools": usage.tool_calls, "seconds": round(usage.seconds, 1)}
     return parsed
 
 
@@ -257,6 +257,7 @@ def verify(case: dict, phone: Phone, language: str = "English",
         parsed["customer_confirms"] = "NO_ANSWER"
     parsed["outcome"], parsed["outcome_note"] = _safe_outcome(parsed)
     parsed["transcript"] = call.transcript
+    parsed["model_seconds"] = round(usage.seconds, 1) if parsed.get("summary") != "The agent did not return a valid result." else None
     return parsed
 
 

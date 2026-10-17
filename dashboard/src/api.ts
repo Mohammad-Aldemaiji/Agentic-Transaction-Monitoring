@@ -41,7 +41,7 @@ export interface Analysis {
   recommended_action: string;
   recommendation_reason: string;
   summary: string;
-  _usage?: { tokens_in: number; tokens_out: number; steps: number; tools: string[] };
+  _usage?: { tokens_in: number; tokens_out: number; steps: number; tools: string[]; seconds?: number };
 }
 
 export interface Verification {

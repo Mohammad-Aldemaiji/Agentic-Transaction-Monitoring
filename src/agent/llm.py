@@ -4,6 +4,7 @@ The agent refuses to start if Ollama is reached over the network or the model ta
 is an Ollama cloud model, so transaction data cannot leave the machine by accident.
 """
 import json
+import time
 from dataclasses import dataclass, field
 from typing import Callable
 from urllib.parse import urlparse
@@ -38,6 +39,7 @@ class Usage:
     tokens_in: int = 0
     tokens_out: int = 0
     steps: int = 0
+    seconds: float = 0.0          # time spent waiting for the model
     tool_calls: list = field(default_factory=list)
 
 
@@ -84,6 +86,22 @@ def status() -> dict:
         return {"ok": False, "model": config.AGENT_MODEL, "host": config.OLLAMA_HOST, "error": str(e)}
 
 
+KEEP_ALIVE = "60m"  # keep the model in memory between cases instead of reloading it
+
+
+def options() -> dict:
+    # The same options on every call: Ollama reloads the model if num_ctx changes.
+    return {"temperature": 0, "seed": 42, "num_ctx": config.AGENT_NUM_CTX}
+
+
+def warm_up() -> str:
+    """Load the model now, so the first alert doesn't wait for it (or hit a cold-start crash)."""
+    t = time.perf_counter()
+    client().chat(model=config.AGENT_MODEL, messages=[{"role": "user", "content": "Reply with OK."}],
+                  think=False, options={**options(), "num_predict": 1}, keep_alive=KEEP_ALIVE)
+    return f"{config.AGENT_MODEL} loaded in {time.perf_counter() - t:.1f} s"
+
+
 def parse_json(text: str):
     """The first {...} object in a reply, or None."""
     try:
@@ -102,12 +120,13 @@ def run(system: str, user: str, tools: list, *, must_call: str = None,
     c = client()
     by_name = {t.name: t for t in tools}
     msgs = [{"role": "system", "content": system}, {"role": "user", "content": user}]
-    options = {"temperature": 0, "seed": 42, "num_ctx": config.AGENT_NUM_CTX}
     u = Usage()
     nudged_call = nudged_json = False
     for _ in range(max_steps):
+        t0 = time.perf_counter()
         r = c.chat(model=config.AGENT_MODEL, messages=msgs, tools=[t.spec() for t in tools],
-                   think=config.AGENT_THINK, options=options)
+                   think=config.AGENT_THINK, options=options(), keep_alive=KEEP_ALIVE)
+        u.seconds += time.perf_counter() - t0
         u.steps += 1
         u.tokens_in += r.prompt_eval_count or 0
         u.tokens_out += r.eval_count or 0
