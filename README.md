@@ -158,7 +158,7 @@ to an external service, and the agent refuses to start if it is pointed at a rem
 # 1. Ollama: install from https://ollama.com/download, then
 ollama pull qwen3:8b
 
-# 2. Python packages (Python 3.11+)
+# 2. Python packages (Python 3.12+; xgboost 3.4.1, which the model was trained with, needs it)
 pip install -r requirements.txt
 
 # 3. Voices for the verification call (optional; without them the phone shows text only)

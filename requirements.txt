@@ -1,3 +1,4 @@
+# Needs Python 3.12+ (xgboost 3.4.1 requires it).
 # Python dependencies for the whole system (scoring, agent, backend).
 # The language model runs in Ollama, installed separately: https://ollama.com/download
 pandas
