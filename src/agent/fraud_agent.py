@@ -1,44 +1,46 @@
 """
-Fraud investigation agent - first experiment.
+Fraud investigation agent, running on a local model.
 
-Choose the model with PROVIDER below:
-    "gemini"  free tier, no credit card  (default)
-    "claude"  paid API, stronger reasoning
+Nothing leaves this machine: the language model runs in Ollama on localhost,
+and the call demo's voice (Piper) and speech recognition (faster-whisper) run
+locally too. No API keys, no cloud calls.
 
-Setup for Gemini (free):
-    1. Get a key at https://aistudio.google.com/apikey
-    2. PowerShell:  setx GEMINI_API_KEY "your-key"   (then open a NEW terminal)
-    3. pip install google-genai pandas pyarrow
-
-Setup for Claude (paid):
-    1. Get a key at https://platform.claude.com
-    2. PowerShell:  setx ANTHROPIC_API_KEY "sk-ant-..."   (then open a NEW terminal)
-    3. pip install anthropic pandas pyarrow
+Setup (once):
+    1. Install Ollama from https://ollama.com/download
+    2. ollama pull qwen3:8b
+    3. pip install -r src/agent/requirements.txt
 
 Put transactions.csv in the repo's data/ folder (it is not in Git).
 
 Usage:
     python src/agent/fraud_agent.py pick          # list test alerts (with ground truth, for YOU only)
     python src/agent/fraud_agent.py TX000123456   # investigate one alert in the terminal
-    python src/agent/call_server.py     # the voice-call demo in the browser
+    python src/agent/call_server.py               # the voice-call demo in the browser
+
+Settings (environment variables, all optional):
+    AGENT_MODEL      Ollama model tag             default qwen3:8b
+    OLLAMA_HOST      where Ollama listens         default http://127.0.0.1:11434
+    AGENT_NUM_CTX    context window in tokens     default 8192
+    AGENT_THINK      1 = let the model reason before each step (slower)   default 0
 
 In the terminal you play two roles:
     - the CUSTOMER, when the agent calls the customer
     - the ANALYST, when the agent asks to execute an action
 """
 import json
+import os
 import sys
-import time
 from pathlib import Path
+from urllib.parse import urlparse
 
 import pandas as pd
 
-PROVIDER = "gemini"   # "gemini" (free) or "claude" (paid)
-MODELS = {
-    "gemini": "gemini-3-flash-preview",  # if unavailable: "gemini-2.5-flash"
-    "claude": "claude-sonnet-5",         # cheaper: "claude-haiku-4-5-20251001"
-}
-MODEL = MODELS[PROVIDER]
+PROVIDER = "ollama (local)"
+MODEL = os.environ.get("AGENT_MODEL", "qwen3:8b")
+OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
+NUM_CTX = int(os.environ.get("AGENT_NUM_CTX", "8192"))
+THINK = os.environ.get("AGENT_THINK", "0") == "1"
+SEED = 42          # fixed seed and temperature 0 so a run can be repeated (NFR4)
 HERE = Path(__file__).resolve().parent   # always look next to this script
 ROOT = HERE.parents[1]                   # repo root (this file is in src/agent/)
 DATA = ROOT / "data" / "transactions.csv"
@@ -321,61 +323,75 @@ def _run_tool(name, args):
         return f"Tool error: {e}"
 
 
-def investigate_claude(txn_id: str, system: str, max_steps: int = 20) -> str:
-    import anthropic
-    client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY
-    msgs = [{"role": "user", "content": f"Alert raised on transaction {txn_id}. Investigate it."}]
-    t_in = t_out = 0
-    for _ in range(max_steps):
-        r = client.messages.create(model=MODEL, max_tokens=4000, system=system,
-                                   tools=TOOL_SPECS, messages=msgs)
-        t_in += r.usage.input_tokens
-        t_out += r.usage.output_tokens
-        msgs.append({"role": "assistant", "content": r.content})
-        calls = [b for b in r.content if b.type == "tool_use"]
-        if not calls:
-            EMIT({"type": "tokens", "in": t_in, "out": t_out})
-            return "".join(b.text for b in r.content if b.type == "text")
-        msgs.append({"role": "user", "content": [
-            {"type": "tool_result", "tool_use_id": c.id, "content": _run_tool(c.name, c.input)}
-            for c in calls]})
-    return "Step limit reached without a decision."
+LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1", "0.0.0.0"}
 
 
-def investigate_gemini(txn_id: str, system: str, max_steps: int = 20) -> str:
-    from google import genai
-    from google.genai import errors, types
-    client = genai.Client()  # reads GEMINI_API_KEY
-    config = types.GenerateContentConfig(
-        system_instruction=system,
-        tools=list(TOOLS.values()),  # declarations built from the docstrings
-        automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
-    )
-    contents = [types.Content(role="user", parts=[types.Part(
-        text=f"Alert raised on transaction {txn_id}. Investigate it.")])]
+def _check_local() -> None:
+    """Refuse to run if the model would not stay on this machine."""
+    host = urlparse(OLLAMA_HOST if "://" in OLLAMA_HOST else "http://" + OLLAMA_HOST).hostname
+    if host not in LOCAL_HOSTS:
+        sys.exit(f"OLLAMA_HOST is {OLLAMA_HOST}. Transaction data may only go to a model "
+                 "on this machine, so point it at localhost.")
+    if "cloud" in MODEL.lower():
+        sys.exit(f"{MODEL} is an Ollama cloud model, which runs on Ollama's servers. "
+                 "Use a local tag such as qwen3:8b.")
+
+
+def _client():
+    import ollama
+    _check_local()
+    client = ollama.Client(host=OLLAMA_HOST)
+    try:
+        info = client.show(MODEL)
+    except ollama.ResponseError:
+        sys.exit(f"Model {MODEL} isn't downloaded yet. Run:  ollama pull {MODEL}")
+    except Exception as e:
+        sys.exit(f"Can't reach Ollama at {OLLAMA_HOST} ({type(e).__name__}). Start the "
+                 "Ollama app (or run `ollama serve`) and try again.")
+    if info.capabilities and "tools" not in info.capabilities:
+        sys.exit(f"{MODEL} doesn't support tool calling in Ollama. Use qwen3:8b or another "
+                 "model tagged 'tools' on ollama.com/library.")
+    return client
+
+
+OLLAMA_TOOLS = [{"type": "function",
+                 "function": {"name": t["name"], "description": t["description"],
+                              "parameters": t["input_schema"]}} for t in TOOL_SPECS]
+
+
+def investigate_local(txn_id: str, system: str, max_steps: int = 20) -> str:
+    client = _client()
+    msgs = [{"role": "system", "content": system},
+            {"role": "user", "content": f"Alert raised on transaction {txn_id}. Investigate it."}]
+    options = {"temperature": 0, "seed": SEED, "num_ctx": NUM_CTX}
     t_in = t_out = 0
+    nudged_action = nudged_json = False
     for _ in range(max_steps):
-        for attempt in range(5):
-            try:
-                r = client.models.generate_content(model=MODEL, contents=contents, config=config)
-                break
-            except errors.APIError as e:
-                if e.code != 429 or attempt == 4:
-                    raise
-                EMIT({"type": "notice", "text": "free-tier rate limit hit, waiting 30 s"})
-                time.sleep(30)
-        u = r.usage_metadata
-        t_in += (u.prompt_token_count or 0) if u else 0
-        t_out += (u.candidates_token_count or 0) if u else 0
-        contents.append(r.candidates[0].content)  # keeps Gemini's thought signatures
-        calls = r.function_calls or []
-        if not calls:
-            EMIT({"type": "tokens", "in": t_in, "out": t_out})
-            return r.text or ""
-        contents.append(types.Content(role="user", parts=[
-            types.Part.from_function_response(
-                name=c.name, response={"result": _run_tool(c.name, dict(c.args or {}))})
-            for c in calls]))
+        r = client.chat(model=MODEL, messages=msgs, tools=OLLAMA_TOOLS,
+                        think=THINK, options=options)
+        t_in += r.prompt_eval_count or 0
+        t_out += r.eval_count or 0
+        m = r.message
+        msgs.append(m)  # keeps the tool calls (and reasoning, if AGENT_THINK=1)
+        if m.tool_calls:
+            for c in m.tool_calls:
+                args = dict(c.function.arguments or {})
+                msgs.append({"role": "tool", "tool_name": c.function.name,
+                             "content": _run_tool(c.function.name, args)})
+            continue
+        text = m.content or ""
+        # Small models sometimes stop early. Give each slip one correction, no more.
+        if not ACTION_LOG and not nudged_action:
+            nudged_action = True
+            msgs.append({"role": "user", "content": "You have not proposed an action yet. "
+                         "Finish the investigation and call propose_action before the final JSON."})
+            continue
+        if parse_result(text) is None and not nudged_json:
+            nudged_json = True
+            msgs.append({"role": "user", "content": "Reply with only the final JSON object."})
+            continue
+        EMIT({"type": "tokens", "in": t_in, "out": t_out})
+        return text
     return "Step limit reached without a decision."
 
 
@@ -386,8 +402,7 @@ def investigate(txn_id: str, language: str = "English") -> str:
     CALL_STATE = "none"
     ALERT_TIME = DF.loc[txn_id, "timestamp"] if txn_id in DF.index else None
     system = SYSTEM_TEMPLATE.format(language=language)
-    run = investigate_gemini if PROVIDER == "gemini" else investigate_claude
-    out = run(txn_id, system).strip()
+    out = investigate_local(txn_id, system).strip()
     if CALL_STATE == "active":  # the agent forgot to hang up
         end_call()
     if out.startswith("```"):  # remove code-block markers around the JSON

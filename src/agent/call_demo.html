@@ -157,7 +157,7 @@ ol.steps li:first-child{border-top:0}
 const $ = id => document.getElementById(id);
 let lang = "English", lastSeq = 0, polling = false, alertsCache = [];
 let inCall = false, awaitingCustomer = false, callStart = 0, timerId = null;
-let audioCtx = null, ringStop = null, recog = null;
+let audioCtx = null, ringStop = null, recog = null;   // recog: the active recording
 
 const CODES = {English: "en-US", Arabic: "ar-SA"};
 let speechCode = "en-US";
@@ -303,7 +303,7 @@ function startCall(){
 }
 let currentAudio = null;
 function endCall(show){
-  if (recog) try{ recog.abort(); }catch(e){}
+  stopListening();
   speechSynthesis.cancel(); stopRing();
   if (currentAudio){ currentAudio.pause(); currentAudio = null; }
   inCall = false; awaitingCustomer = false; clearInterval(timerId);
@@ -317,14 +317,15 @@ $("hangBtn").onclick = () => {
 };
 
 function pickVoice(){
+  // Only voices installed on this computer. Network voices ("Google …", "… Online (Natural)")
+  // would send the agent's words, amounts and merchant names to a cloud service.
   const code = speechCode, pre = code.slice(0,2);
-  const vs = speechSynthesis.getVoices().filter(v => v.lang.replace("_","-").toLowerCase().startsWith(pre));
-  const score = v => (v.lang.toLowerCase() === code.toLowerCase() ? 4 : 0) + (/natural|online|neural/i.test(v.name) ? 3 : 0) + (/google/i.test(v.name) ? 1 : 0);
-  return vs.sort((a,b) => score(b) - score(a))[0] || null;
+  const vs = speechSynthesis.getVoices().filter(v => v.localService && v.lang.replace("_","-").toLowerCase().startsWith(pre));
+  return vs.sort((a,b) => (b.lang.toLowerCase() === code.toLowerCase()) - (a.lang.toLowerCase() === code.toLowerCase()))[0] || null;
 }
 function say(text, audioUrl){
   bubble("agent", text);
-  if (audioUrl) return new Promise(res => {          // Gemini's voice
+  if (audioUrl) return new Promise(res => {          // the local Piper voice
     const a = new Audio(audioUrl); currentAudio = a;
     let done = false; const fin = () => { if (!done){ done = true; currentAudio = null; res(); } };
     a.onended = fin;
@@ -334,11 +335,13 @@ function say(text, audioUrl){
   });
   return browserSay(text);
 }
-function browserSay(text){                           // fallback: the browser's own voice
+function browserSay(text){                           // fallback: an offline voice on this computer
   if (!inCall) return Promise.resolve();
+  const v = pickVoice();
+  if (!v){ $("micHint").textContent = "No offline voice installed for this language. Read the agent's line above."; return Promise.resolve(); }
   return new Promise(res => {
     const u = new SpeechSynthesisUtterance(text);
-    const v = pickVoice(); if (v) u.voice = v;
+    u.voice = v;
     u.lang = speechCode; u.rate = 1.0;
     let done = false; const fin = () => { if (!done){ done = true; res(); } };
     u.onend = fin; u.onerror = fin;
@@ -347,35 +350,57 @@ function browserSay(text){                           // fallback: the browser's 
   });
 }
 
-function listen(){
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR){ $("micHint").textContent = "Speech recognition isn't available in this browser. Type the reply instead."; $("typeIn").focus(); return; }
-  if (recog) try{ recog.abort(); }catch(e){}
-  recog = new SR(); recog.lang = speechCode; recog.interimResults = true; recog.continuous = false;
-  let interim = null, finalText = "";
-  recog.onstart = () => $("micBtn").classList.add("listening");
-  recog.onresult = ev => {
-    let t = ""; finalText = "";
-    for (const r of ev.results){ if (r.isFinal) finalText += r[0].transcript; else t += r[0].transcript; }
-    if (!interim){ interim = bubble("cust interim", ""); }
-    interim.textContent = finalText || t;
-  };
-  recog.onend = () => {
+// Record the customer's answer and transcribe it on our own server (faster-whisper).
+// The browser's SpeechRecognition is not used: Chrome and Edge send the audio to their cloud.
+let micStream = null;
+async function listen(){
+  if (recog) return;                              // already recording
+  if (!navigator.mediaDevices || !window.MediaRecorder){ $("micHint").textContent = "Recording isn't available in this browser. Type the reply instead."; $("typeIn").focus(); return; }
+  try{ micStream = micStream || await navigator.mediaDevices.getUserMedia({audio: {echoCancellation: true, noiseSuppression: true}}); }
+  catch(e){ $("micHint").textContent = "Microphone blocked. Allow it in the address bar, or type the reply."; return; }
+  const rec = new MediaRecorder(micStream), chunks = [];
+  recog = rec;
+  rec.ondataavailable = ev => { if (ev.data.size) chunks.push(ev.data); };
+
+  // Stop by itself: 1.2 s of quiet after speech, nothing said for 8 s, or 20 s in total.
+  const ctx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+  const src = ctx.createMediaStreamSource(micStream), an = ctx.createAnalyser();
+  an.fftSize = 1024; src.connect(an);
+  const buf = new Float32Array(an.fftSize), t0 = Date.now();
+  let spoke = false, quietSince = Date.now();
+  const tick = setInterval(() => {
+    an.getFloatTimeDomainData(buf);
+    const rms = Math.sqrt(buf.reduce((a, x) => a + x*x, 0) / buf.length);
+    if (rms > 0.02){ spoke = true; quietSince = Date.now(); }
+    const age = Date.now() - t0;
+    if ((spoke && Date.now() - quietSince > 1200) || (!spoke && age > 8000) || age > 20000) rec.stop();
+  }, 100);
+
+  rec.onstop = async () => {
+    clearInterval(tick); src.disconnect(); recog = null;
     $("micBtn").classList.remove("listening");
-    if (interim) interim.remove();
-    if (finalText.trim() && awaitingCustomer) reply(finalText.trim());
-    else if (awaitingCustomer) $("micHint").textContent = "Didn't catch that. Tap 🎙 and speak, or type the reply.";
+    if (!awaitingCustomer) return;                // hung up or typed meanwhile
+    if (!spoke){ $("micHint").textContent = "Didn't hear anything. Tap 🎙 and speak, or type the reply."; return; }
+    const b = bubble("cust interim", "Transcribing…");
+    try{
+      const r = await fetch("/api/transcribe", {method: "POST", headers: {"Content-Type": rec.mimeType || "audio/webm"}, body: new Blob(chunks, {type: rec.mimeType})});
+      const d = await r.json(); b.remove();
+      if (!r.ok) throw new Error(d.detail || r.status);
+      if (d.text && awaitingCustomer) reply(d.text);
+      else if (awaitingCustomer) $("micHint").textContent = "Didn't catch that. Tap 🎙 and speak, or type the reply.";
+    }catch(e){ b.remove(); $("micHint").textContent = "Transcription failed (" + e.message + "). Type the reply instead."; }
   };
-  recog.onerror = ev => { if (ev.error === "not-allowed") $("micHint").textContent = "Microphone blocked. Allow it in the address bar, or type the reply."; };
-  try{ recog.start(); }catch(e){}
+  rec.start(250);
+  $("micBtn").classList.add("listening");
 }
-$("micBtn").onclick = () => { if (awaitingCustomer) listen(); };
+function stopListening(){ if (recog && recog.state !== "inactive") try{ recog.stop(); }catch(e){} }
+$("micBtn").onclick = () => { if (!awaitingCustomer) return; recog ? stopListening() : listen(); };
 $("typeSend").onclick = () => { const v = $("typeIn").value.trim(); if (v && awaitingCustomer){ $("typeIn").value = ""; reply(v); } };
 $("typeIn").onkeydown = e => { if (e.key === "Enter") $("typeSend").click(); };
 
 async function reply(text, silent){
   awaitingCustomer = false; pendingTurn = false;
-  if (recog) try{ recog.abort(); }catch(e){}
+  stopListening();
   if (!silent) bubble("cust", text);
   if (inCall) showThinking();
   $("micHint").textContent = "The agent listens after it speaks. Tap 🎙 to answer again.";

@@ -131,6 +131,7 @@ agentic-transaction-monitoring/
 | Frontend | React, TypeScript |
 | Testing | pytest, Locust |
 | Infrastructure | Docker, Docker Compose, GitHub Actions |
+| Agent (all local) | Ollama with Qwen3 8B for the agent, Piper for its voice, faster-whisper for speech recognition |
 
 ## Getting started
 
@@ -144,6 +145,34 @@ python3 main.py --customers 2400 --rate-scale 0.28 --seed 20260921 --out ../data
 # Start the full system
 docker compose up
 ```
+
+## Running the agent
+
+The investigation agent and its voice-call demo run entirely on your own machine.
+No transaction data, prompt, voice or recording is sent to any external service,
+and the agent refuses to start if it is pointed at a remote or cloud model.
+
+```bash
+# once
+#   install Ollama: https://ollama.com/download
+ollama pull qwen3:8b
+pip install -r src/agent/requirements.txt
+cd src/agent
+python -m piper.download_voices en_US-lessac-medium ar_JO-kareem-medium --download-dir voices
+
+# terminal version
+python fraud_agent.py pick
+python fraud_agent.py TX000123456
+
+# voice-call demo, then open http://localhost:8000
+python call_server.py
+```
+
+Settings are environment variables: `AGENT_MODEL` (default `qwen3:8b`), `AGENT_THINK=1`
+to let the model reason before each step (better decisions, slower),
+`WHISPER_MODEL` (`small` by default, `medium` is better for Arabic) and
+`WHISPER_DEVICE=cuda` if CUDA 12 and cuDNN are installed. Downloads (the model,
+the voices, the Whisper weights) happen once; after that everything works offline.
 
 ## Roadmap
 

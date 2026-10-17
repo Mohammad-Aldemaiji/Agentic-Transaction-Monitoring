@@ -1,28 +1,35 @@
 """
-Voice-call demo for the fraud investigation agent.
+Voice-call demo for the fraud investigation agent. Everything runs locally.
 
-    pip install fastapi uvicorn       (plus the packages fraud_agent.py needs)
+    pip install -r requirements.txt
+    python -m piper.download_voices en_US-lessac-medium ar_JO-kareem-medium --download-dir voices
     python call_server.py
     then open  http://localhost:8000  in Microsoft Edge or Google Chrome
 
 The agent logic is the same as in fraud_agent.py. This file only replaces the
 terminal with a browser: an analyst console on the left and a phone on the right.
 
-The agent's voice comes from Gemini text-to-speech (free tier). Clips are cached
-in the tts_cache folder, so repeated lines cost nothing and play instantly. If
-Gemini's voice fails or hits its limit, the browser's built-in voice is used.
-Speech recognition (the customer's side) comes from the browser.
+    Agent         Ollama on localhost (see fraud_agent.py)
+    Agent voice   Piper text-to-speech, voice files in ./voices
+    Customer      faster-whisper speech-to-text on this machine
+
+The page records the microphone and sends the clip to this server, not to the
+browser's own speech recognition (Chrome's and Edge's send audio to their cloud).
+Downloads happen once (Piper voices, the Whisper model); after that it runs offline.
 """
 import hashlib
+import io
+import os
 import threading
 import traceback
 import wave
 from pathlib import Path
 
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
+from starlette.concurrency import run_in_threadpool
 
 import fraud_agent as fa
 
@@ -30,11 +37,11 @@ HERE = Path(__file__).resolve().parent
 app = FastAPI()
 
 # ------------------------------------------------------------------ voice
-USE_GEMINI_VOICE = True
-TTS_MODEL = "gemini-3.1-flash-tts-preview"
-VOICE = "Kore"   # others to try: Charon, Puck, Aoede, Orus, Zephyr
-STYLE = "Say in a calm, warm and professional tone, like a bank's customer care agent: "
+VOICE_DIR = HERE / "voices"
+VOICES = {"English": "en_US-lessac-medium", "Arabic": "ar_JO-kareem-medium"}
 TTS_DIR = HERE / "tts_cache"
+WHISPER_MODEL = os.environ.get("WHISPER_MODEL", "small")      # "medium" is better for Arabic, slower
+WHISPER_DEVICE = os.environ.get("WHISPER_DEVICE", "cpu")       # "cuda" if CUDA 12 + cuDNN are installed
 
 LINES = {
     "English": {
@@ -43,7 +50,7 @@ LINES = {
                  "one-time password or card number. If you are not sure this call is "
                  "genuine, hang up and call the number on the back of your card.",
         "bye": "Thank you for your time. The bank will follow up with you shortly. Goodbye.",
-        "code": "en-US",
+        "code": "en-US", "whisper": "en",
     },
     "Arabic": {
         "intro": "السلام عليكم، معك فريق مكافحة الاحتيال في البنك، نتصل بخصوص عمليات حديثة "
@@ -51,48 +58,63 @@ LINES = {
                  "إذا لم تكن متأكداً أن هذه المكالمة من البنك، أغلق الخط واتصل بالرقم "
                  "الموجود خلف بطاقتك.",
         "bye": "شكراً لوقتك، سيتواصل معك البنك قريباً. مع السلامة.",
-        "code": "ar-SA",
+        "code": "ar-SA", "whisper": "ar",
     },
 }
-_tts_client = None
+_voices = {}
 _tts_lock = threading.Lock()
+_whisper = None
+_whisper_lock = threading.Lock()
+
+
+def _voice(language: str):
+    """Load the Piper voice for a language once, or return None if it isn't downloaded."""
+    if language not in _voices:
+        from piper import PiperVoice
+        path = VOICE_DIR / f"{VOICES[language]}.onnx"
+        _voices[language] = PiperVoice.load(path) if path.exists() else None
+    return _voices[language]
 
 
 def tts(text: str):
-    """Return a URL for a WAV of `text` in Gemini's voice, or None to fall back
-    to the browser's voice."""
-    if not USE_GEMINI_VOICE:
-        return None
-    global _tts_client
-    key = hashlib.sha1(f"{TTS_MODEL}|{VOICE}|{STYLE}|{text}".encode()).hexdigest()[:20]
+    """Return a URL for a WAV of `text` in the local Piper voice, or None to fall
+    back to the browser's offline voice."""
+    name = VOICES[S.language]
+    key = hashlib.sha1(f"piper|{name}|{text}".encode()).hexdigest()[:20]
     path = TTS_DIR / f"{key}.wav"
-    with _tts_lock:  # one request at a time; also stops duplicate work
-        if not path.exists() and S.voice_down:
+    with _tts_lock:  # one synthesis at a time; also stops duplicate work
+        if path.exists():
+            return f"/api/audio/{key}.wav"
+        if S.voice_down:
             return None
-        if not path.exists():
-            try:
-                from google import genai
-                from google.genai import types
-                _tts_client = _tts_client or genai.Client()
-                r = _tts_client.models.generate_content(
-                    model=TTS_MODEL, contents=STYLE + text,
-                    config=types.GenerateContentConfig(
-                        response_modalities=["AUDIO"],
-                        speech_config=types.SpeechConfig(voice_config=types.VoiceConfig(
-                            prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name=VOICE)))))
-                pcm = r.candidates[0].content.parts[0].inline_data.data
-                TTS_DIR.mkdir(exist_ok=True)
-                with wave.open(str(path), "wb") as w:  # 24 kHz, 16-bit, mono
-                    w.setnchannels(1)
-                    w.setsampwidth(2)
-                    w.setframerate(24000)
-                    w.writeframes(pcm)
-            except Exception as e:
-                S.voice_down = True
-                S.emit({"type": "notice", "text": f"Gemini voice unavailable, using the "
-                                                  f"browser voice ({type(e).__name__}: {str(e)[:120]})"})
-                return None
+        try:
+            voice = _voice(S.language)
+            if voice is None:
+                raise FileNotFoundError(f"voices/{name}.onnx is missing. Download it with: "
+                                        f"python -m piper.download_voices {name} --download-dir voices")
+            TTS_DIR.mkdir(exist_ok=True)
+            with wave.open(str(path), "wb") as w:
+                voice.synthesize_wav(text, w)
+        except Exception as e:
+            path.unlink(missing_ok=True)
+            S.voice_down = True
+            S.emit({"type": "notice", "text": f"Piper voice unavailable, using the browser's "
+                                              f"offline voice ({type(e).__name__}: {str(e)[:160]})"})
+            return None
     return f"/api/audio/{key}.wav"
+
+
+def transcribe(audio: bytes, language: str) -> str:
+    """Speech to text with faster-whisper, on this machine."""
+    global _whisper
+    from faster_whisper import WhisperModel
+    with _whisper_lock:
+        if _whisper is None:
+            compute = "int8" if WHISPER_DEVICE == "cpu" else "float16"
+            _whisper = WhisperModel(WHISPER_MODEL, device=WHISPER_DEVICE, compute_type=compute)
+        segments, _ = _whisper.transcribe(io.BytesIO(audio), language=LINES[language]["whisper"],
+                                          beam_size=5, vad_filter=True)
+        return " ".join(s.text.strip() for s in segments).strip()
 
 
 def line(kind: str) -> dict:
@@ -109,7 +131,7 @@ class Session:
         self.running = False
         self.language = "English"
         self.in_call = False
-        self.voice_down = False   # after one Gemini voice failure, stop retrying this run
+        self.voice_down = False   # after one Piper failure, stop retrying this run
         self._reply = None        # (threading.Event, [value]) the agent is waiting on
 
     def emit(self, event: dict) -> None:
@@ -219,6 +241,18 @@ def audio(name: str):
     if not path.exists():
         raise HTTPException(404)
     return FileResponse(path, media_type="audio/wav")
+
+
+@app.post("/api/transcribe")
+async def stt(request: Request):
+    audio = await request.body()
+    if not audio:
+        raise HTTPException(400, "No audio received.")
+    try:
+        return {"text": await run_in_threadpool(transcribe, audio, S.language)}
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(500, f"Speech recognition failed: {type(e).__name__}: {e}")
 
 
 @app.get("/api/alerts")
