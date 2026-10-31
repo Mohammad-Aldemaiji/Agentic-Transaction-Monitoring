@@ -1,0 +1,452 @@
+[
+  {
+    "external_id": "TX000045242",
+    "account_id": "SA65B10007000000144",
+    "amount_minor": 9935,
+    "currency": "SAR",
+    "channel": "CARD",
+    "occurred_at": "2026-08-11T01:29:21+03:00",
+    "idempotency_key": "sample-e05-TX000045242"
+  },
+  {
+    "external_id": "TX000604357",
+    "account_id": "SA60B10007000001974",
+    "amount_minor": 1223,
+    "currency": "SAR",
+    "channel": "CARD",
+    "occurred_at": "2026-08-11T03:12:26+03:00",
+    "idempotency_key": "sample-e05-TX000604357"
+  },
+  {
+    "external_id": "TX000534407",
+    "account_id": "SA28B10007000001746",
+    "amount_minor": 5016,
+    "currency": "SAR",
+    "channel": "TRANSFER",
+    "occurred_at": "2026-08-11T04:00:14+03:00",
+    "idempotency_key": "sample-e05-TX000534407"
+  },
+  {
+    "external_id": "TX000684207",
+    "account_id": "SA53B10007000002240",
+    "amount_minor": 574,
+    "currency": "SAR",
+    "channel": "CARD",
+    "occurred_at": "2026-08-11T05:50:15+03:00",
+    "idempotency_key": "sample-e05-TX000684207"
+  },
+  {
+    "external_id": "TX000542154",
+    "account_id": "SA24B10007000001770",
+    "amount_minor": 511,
+    "currency": "SAR",
+    "channel": "ONLINE",
+    "occurred_at": "2026-08-11T06:58:17+03:00",
+    "idempotency_key": "sample-e05-TX000542154"
+  },
+  {
+    "external_id": "TX000491634",
+    "account_id": "SA41B10007000001602",
+    "amount_minor": 40259,
+    "currency": "SAR",
+    "channel": "CARD",
+    "occurred_at": "2026-08-11T07:07:45+03:00",
+    "idempotency_key": "sample-e05-TX000491634"
+  },
+  {
+    "external_id": "TX000439553",
+    "account_id": "SA36B10007000001436",
+    "amount_minor": 843,
+    "currency": "SAR",
+    "channel": "ONLINE",
+    "occurred_at": "2026-08-11T07:13:49+03:00",
+    "idempotency_key": "sample-e05-TX000439553"
+  },
+  {
+    "external_id": "TX000379951",
+    "account_id": "SA75B10007000001247",
+    "amount_minor": 860,
+    "currency": "SAR",
+    "channel": "CARD",
+    "occurred_at": "2026-08-11T08:40:53+03:00",
+    "idempotency_key": "sample-e05-TX000379951"
+  },
+  {
+    "external_id": "TX000329943",
+    "account_id": "SA70B10007000001078",
+    "amount_minor": 233541,
+    "currency": "SAR",
+    "channel": "TRANSFER",
+    "occurred_at": "2026-08-11T10:02:11+03:00",
+    "idempotency_key": "sample-e05-TX000329943"
+  },
+  {
+    "external_id": "TX000163352",
+    "account_id": "SA69B10007000000543",
+    "amount_minor": 2942,
+    "currency": "SAR",
+    "channel": "TRANSFER",
+    "occurred_at": "2026-08-11T10:20:48+03:00",
+    "idempotency_key": "sample-e05-TX000163352"
+  },
+  {
+    "external_id": "TX000652569",
+    "account_id": "SA85B10007000002137",
+    "amount_minor": 188953,
+    "currency": "SAR",
+    "channel": "CARD",
+    "occurred_at": "2026-08-11T11:04:01+03:00",
+    "idempotency_key": "sample-e05-TX000652569"
+  },
+  {
+    "external_id": "TX000743728",
+    "account_id": "SA26B10007000001505",
+    "amount_minor": 1384536,
+    "currency": "SAR",
+    "channel": "CARD",
+    "occurred_at": "2026-08-11T11:44:46+03:00",
+    "idempotency_key": "sample-e05-TX000743728"
+  },
+  {
+    "external_id": "TX000132269",
+    "account_id": "SA86B10007000000435",
+    "amount_minor": 181873,
+    "currency": "SAR",
+    "channel": "TRANSFER",
+    "occurred_at": "2026-08-11T11:44:49+03:00",
+    "idempotency_key": "sample-e05-TX000132269"
+  },
+  {
+    "external_id": "TX000512601",
+    "account_id": "SA77B10007000001674",
+    "amount_minor": 21700,
+    "currency": "SAR",
+    "channel": "CARD",
+    "occurred_at": "2026-08-11T12:39:46+03:00",
+    "idempotency_key": "sample-e05-TX000512601"
+  },
+  {
+    "external_id": "TX000349246",
+    "account_id": "SA42B10007000001147",
+    "amount_minor": 1103,
+    "currency": "SAR",
+    "channel": "CARD",
+    "occurred_at": "2026-08-11T13:03:16+03:00",
+    "idempotency_key": "sample-e05-TX000349246"
+  },
+  {
+    "external_id": "TX000734386",
+    "account_id": "SA74B10007000000406",
+    "amount_minor": 235957,
+    "currency": "SAR",
+    "channel": "TRANSFER",
+    "occurred_at": "2026-08-11T13:55:15+03:00",
+    "idempotency_key": "sample-e05-TX000734386"
+  },
+  {
+    "external_id": "TX000640683",
+    "account_id": "SA52B10007000002100",
+    "amount_minor": 103208,
+    "currency": "SAR",
+    "channel": "TRANSFER",
+    "occurred_at": "2026-08-11T14:06:11+03:00",
+    "idempotency_key": "sample-e05-TX000640683"
+  },
+  {
+    "external_id": "TX000734385",
+    "account_id": "SA74B10007000000406",
+    "amount_minor": 236305,
+    "currency": "SAR",
+    "channel": "TRANSFER",
+    "occurred_at": "2026-08-11T15:52:00+03:00",
+    "idempotency_key": "sample-e05-TX000734385"
+  },
+  {
+    "external_id": "TX000284248",
+    "account_id": "SA81B10007000000933",
+    "amount_minor": 88917,
+    "currency": "SAR",
+    "channel": "CARD",
+    "occurred_at": "2026-08-11T16:43:48+03:00",
+    "idempotency_key": "sample-e05-TX000284248"
+  },
+  {
+    "external_id": "TX000043197",
+    "account_id": "SA57B10007000000140",
+    "amount_minor": 757009,
+    "currency": "SAR",
+    "channel": "TRANSFER",
+    "occurred_at": "2026-08-11T16:50:53+03:00",
+    "idempotency_key": "sample-e05-TX000043197"
+  },
+  {
+    "external_id": "TX000357436",
+    "account_id": "SA67B10007000001174",
+    "amount_minor": 94203,
+    "currency": "SAR",
+    "channel": "ONLINE",
+    "occurred_at": "2026-08-11T17:18:05+03:00",
+    "idempotency_key": "sample-e05-TX000357436"
+  },
+  {
+    "external_id": "TX000117608",
+    "account_id": "SA38B10007000000386",
+    "amount_minor": 192745,
+    "currency": "SAR",
+    "channel": "CARD",
+    "occurred_at": "2026-08-11T17:27:25+03:00",
+    "idempotency_key": "sample-e05-TX000117608"
+  },
+  {
+    "external_id": "TX000137531",
+    "account_id": "SA75B10007000000451",
+    "amount_minor": 566677,
+    "currency": "SAR",
+    "channel": "ONLINE",
+    "occurred_at": "2026-08-11T17:56:24+03:00",
+    "idempotency_key": "sample-e05-TX000137531"
+  },
+  {
+    "external_id": "TX000734384",
+    "account_id": "SA74B10007000000406",
+    "amount_minor": 239396,
+    "currency": "SAR",
+    "channel": "TRANSFER",
+    "occurred_at": "2026-08-11T19:50:32+03:00",
+    "idempotency_key": "sample-e05-TX000734384"
+  },
+  {
+    "external_id": "TX000276143",
+    "account_id": "SA42B10007000000906",
+    "amount_minor": 9735,
+    "currency": "SAR",
+    "channel": "TRANSFER",
+    "occurred_at": "2026-08-11T20:25:39+03:00",
+    "idempotency_key": "sample-e05-TX000276143"
+  },
+  {
+    "external_id": "TX000732251",
+    "account_id": "SA86B10007000000284",
+    "amount_minor": 100000,
+    "currency": "SAR",
+    "channel": "TRANSFER",
+    "occurred_at": "2026-08-11T20:57:07+03:00",
+    "idempotency_key": "sample-e05-TX000732251"
+  },
+  {
+    "external_id": "TX000316641",
+    "account_id": "SA53B10007000001034",
+    "amount_minor": 739,
+    "currency": "SAR",
+    "channel": "CARD",
+    "occurred_at": "2026-08-11T21:33:41+03:00",
+    "idempotency_key": "sample-e05-TX000316641"
+  },
+  {
+    "external_id": "TX000583595",
+    "account_id": "SA56B10007000001905",
+    "amount_minor": 1446,
+    "currency": "SAR",
+    "channel": "TRANSFER",
+    "occurred_at": "2026-08-11T21:35:43+03:00",
+    "idempotency_key": "sample-e05-TX000583595"
+  },
+  {
+    "external_id": "TX000144258",
+    "account_id": "SA50B10007000000474",
+    "amount_minor": 2051,
+    "currency": "SAR",
+    "channel": "CARD",
+    "occurred_at": "2026-08-11T22:02:53+03:00",
+    "idempotency_key": "sample-e05-TX000144258"
+  },
+  {
+    "external_id": "TX000173315",
+    "account_id": "SA58B10007000000573",
+    "amount_minor": 54160,
+    "currency": "SAR",
+    "channel": "TRANSFER",
+    "occurred_at": "2026-08-11T22:25:21+03:00",
+    "idempotency_key": "sample-e05-TX000173315"
+  },
+  {
+    "external_id": "TX000589162",
+    "account_id": "SA57B10007000001924",
+    "amount_minor": 1784,
+    "currency": "SAR",
+    "channel": "CARD",
+    "occurred_at": "2026-08-11T22:35:14+03:00",
+    "idempotency_key": "sample-e05-TX000589162"
+  },
+  {
+    "external_id": "TX000489030",
+    "account_id": "SA49B10007000001595",
+    "amount_minor": 58606,
+    "currency": "SAR",
+    "channel": "TRANSFER",
+    "occurred_at": "2026-08-11T23:41:18+03:00",
+    "idempotency_key": "sample-e05-TX000489030"
+  },
+  {
+    "external_id": "TX000537841",
+    "account_id": "SA23B10007000001757",
+    "amount_minor": 564,
+    "currency": "SAR",
+    "channel": "CARD",
+    "occurred_at": "2026-08-12T00:32:16+03:00",
+    "idempotency_key": "sample-e05-TX000537841"
+  },
+  {
+    "external_id": "TX000734391",
+    "account_id": "SA74B10007000000406",
+    "amount_minor": 235492,
+    "currency": "SAR",
+    "channel": "TRANSFER",
+    "occurred_at": "2026-08-12T01:20:58+03:00",
+    "idempotency_key": "sample-e05-TX000734391"
+  },
+  {
+    "external_id": "TX000638497",
+    "account_id": "SA59B10007000002094",
+    "amount_minor": 7267,
+    "currency": "SAR",
+    "channel": "CARD",
+    "occurred_at": "2026-08-12T01:28:28+03:00",
+    "idempotency_key": "sample-e05-TX000638497"
+  },
+  {
+    "external_id": "TX000410994",
+    "account_id": "SA27B10007000001344",
+    "amount_minor": 1147,
+    "currency": "SAR",
+    "channel": "CARD",
+    "occurred_at": "2026-08-12T02:16:51+03:00",
+    "idempotency_key": "sample-e05-TX000410994"
+  },
+  {
+    "external_id": "TX000458564",
+    "account_id": "SA76B10007000001495",
+    "amount_minor": 12653,
+    "currency": "SAR",
+    "channel": "CARD",
+    "occurred_at": "2026-08-12T03:32:17+03:00",
+    "idempotency_key": "sample-e05-TX000458564"
+  },
+  {
+    "external_id": "TX000622287",
+    "account_id": "SA51B10007000002036",
+    "amount_minor": 510283,
+    "currency": "SAR",
+    "channel": "TRANSFER",
+    "occurred_at": "2026-08-12T06:34:35+03:00",
+    "idempotency_key": "sample-e05-TX000622287"
+  },
+  {
+    "external_id": "TX000561609",
+    "account_id": "SA44B10007000001835",
+    "amount_minor": 24952,
+    "currency": "SAR",
+    "channel": "TRANSFER",
+    "occurred_at": "2026-08-12T06:37:21+03:00",
+    "idempotency_key": "sample-e05-TX000561609"
+  },
+  {
+    "external_id": "TX000556515",
+    "account_id": "SA61B10007000001819",
+    "amount_minor": 106822,
+    "currency": "SAR",
+    "channel": "ONLINE",
+    "occurred_at": "2026-08-12T06:59:57+03:00",
+    "idempotency_key": "sample-e05-TX000556515"
+  },
+  {
+    "external_id": "TX000734387",
+    "account_id": "SA74B10007000000406",
+    "amount_minor": 236321,
+    "currency": "SAR",
+    "channel": "TRANSFER",
+    "occurred_at": "2026-08-12T07:22:06+03:00",
+    "idempotency_key": "sample-e05-TX000734387"
+  },
+  {
+    "external_id": "TX000482130",
+    "account_id": "SA81B10007000001575",
+    "amount_minor": 4192,
+    "currency": "SAR",
+    "channel": "CARD",
+    "occurred_at": "2026-08-12T07:41:36+03:00",
+    "idempotency_key": "sample-e05-TX000482130"
+  },
+  {
+    "external_id": "TX000287566",
+    "account_id": "SA70B10007000000942",
+    "amount_minor": 4130,
+    "currency": "SAR",
+    "channel": "CARD",
+    "occurred_at": "2026-08-12T08:00:52+03:00",
+    "idempotency_key": "sample-e05-TX000287566"
+  },
+  {
+    "external_id": "TX000025668",
+    "account_id": "SA94B10007000000084",
+    "amount_minor": 36127,
+    "currency": "SAR",
+    "channel": "CARD",
+    "occurred_at": "2026-08-12T08:34:56+03:00",
+    "idempotency_key": "sample-e05-TX000025668"
+  },
+  {
+    "external_id": "TX000099737",
+    "account_id": "SA37B10007000000329",
+    "amount_minor": 24119,
+    "currency": "SAR",
+    "channel": "CARD",
+    "occurred_at": "2026-08-12T08:50:16+03:00",
+    "idempotency_key": "sample-e05-TX000099737"
+  },
+  {
+    "external_id": "TX000522413",
+    "account_id": "SA88B10007000001705",
+    "amount_minor": 8955,
+    "currency": "SAR",
+    "channel": "CARD",
+    "occurred_at": "2026-08-12T09:02:13+03:00",
+    "idempotency_key": "sample-e05-TX000522413"
+  },
+  {
+    "external_id": "TX000685788",
+    "account_id": "SA84B10007000002246",
+    "amount_minor": 9911,
+    "currency": "SAR",
+    "channel": "CARD",
+    "occurred_at": "2026-08-12T09:38:23+03:00",
+    "idempotency_key": "sample-e05-TX000685788"
+  },
+  {
+    "external_id": "TX000733650",
+    "account_id": "SA34B10007000002320",
+    "amount_minor": 71069,
+    "currency": "SAR",
+    "channel": "ONLINE",
+    "occurred_at": "2026-08-12T09:48:39+03:00",
+    "idempotency_key": "sample-e05-TX000733650"
+  },
+  {
+    "external_id": "TX000733649",
+    "account_id": "SA34B10007000002320",
+    "amount_minor": 4000,
+    "currency": "SAR",
+    "channel": "ONLINE",
+    "occurred_at": "2026-08-12T09:57:09+03:00",
+    "idempotency_key": "sample-e05-TX000733649"
+  },
+  {
+    "external_id": "TX000734390",
+    "account_id": "SA74B10007000000406",
+    "amount_minor": 247425,
+    "currency": "SAR",
+    "channel": "TRANSFER",
+    "occurred_at": "2026-08-12T09:57:46+03:00",
+    "idempotency_key": "sample-e05-TX000734390"
+  }
+]

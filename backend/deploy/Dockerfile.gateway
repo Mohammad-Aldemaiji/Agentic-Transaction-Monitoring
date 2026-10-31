@@ -1,0 +1,17 @@
+FROM golang:1.27.3-alpine@sha256:b8c9b82affbbb82a020bbcf998dad2ba9516944ac7e883524642a481a9505e9c AS builder
+WORKDIR /build
+RUN go mod init local/atm-gateway && \
+    go get github.com/caddyserver/caddy/v2/cmd/caddy@v2.11.7 && \
+    go get golang.org/x/net@v0.60.0 && \
+    CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /caddy github.com/caddyserver/caddy/v2/cmd/caddy
+
+RUN CGO_ENABLED=0 go list -deps -tags netgo github.com/caddyserver/caddy/v2/cmd/caddy > /build-dependencies.txt
+
+FROM caddy:2.11.7-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
+ARG OS_PATCH_REVISION=2026-10-22
+RUN apk upgrade --no-cache && apk add --no-cache curl && rm /usr/bin/caddy
+# Rebuilt with patched Go and x/net; no file capabilities are needed on high ports.
+COPY --from=builder /caddy /usr/bin/caddy
+USER 10001:10001
+
+COPY --from=builder /build-dependencies.txt /usr/share/atm/build-dependencies.txt

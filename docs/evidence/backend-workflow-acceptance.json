@@ -1,0 +1,131 @@
+{
+  "verified_on": "2026-10-25",
+  "scope": "Backend handlers and workers with synthetic identities and isolated Supabase atm_test storage",
+  "tests": 23,
+  "failures": 0,
+  "errors": 0,
+  "duration_seconds": 899.985,
+  "cases": [
+    {
+      "name": "test_verification_uses_supplied_configuration",
+      "class": "tests.test_verify_database_config",
+      "seconds": 0.024
+    },
+    {
+      "name": "test_declined_call_and_rejected_action_allow_reviewed_resolution",
+      "class": "tests.test_negative_workflow",
+      "seconds": 65.133
+    },
+    {
+      "name": "test_browser_rotation_and_bearer_share_identity_rate_limit",
+      "class": "tests.test_sessions_management",
+      "seconds": 35.475
+    },
+    {
+      "name": "test_browser_session_csrf_rotation_logout_and_revocation",
+      "class": "tests.test_sessions_management",
+      "seconds": 19.642
+    },
+    {
+      "name": "test_login_origin_and_idle_expiry",
+      "class": "tests.test_sessions_management",
+      "seconds": 12.837
+    },
+    {
+      "name": "test_policy_requires_independent_recent_supervisor",
+      "class": "tests.test_sessions_management",
+      "seconds": 18.522
+    },
+    {
+      "name": "test_reviewed_snapshot_model_review_and_drift",
+      "class": "tests.test_sessions_management",
+      "seconds": 34.378
+    },
+    {
+      "name": "test_audio_is_call_scoped_and_text_survives_voice_failure",
+      "class": "tests.test_sessions_management",
+      "seconds": 42.359
+    },
+    {
+      "name": "test_complete_call_approval_decision_scenario[en]",
+      "class": "tests.test_workflows",
+      "seconds": 91.489
+    },
+    {
+      "name": "test_complete_call_approval_decision_scenario[ar]",
+      "class": "tests.test_workflows",
+      "seconds": 108.578
+    },
+    {
+      "name": "test_worker_failure_is_not_normal_and_recovers",
+      "class": "tests.test_workflows",
+      "seconds": 30.668
+    },
+    {
+      "name": "test_timeout_releases_case",
+      "class": "tests.test_workflows",
+      "seconds": 31.876
+    },
+    {
+      "name": "test_unavailable_scoring_is_a_complete_manual_review_workflow",
+      "class": "tests.test_backend_application",
+      "seconds": 96.399
+    },
+    {
+      "name": "test_approved_work_blocks_closure_and_evidence_changes_until_receipt",
+      "class": "tests.test_action_integrity",
+      "seconds": 41.276
+    },
+    {
+      "name": "test_cancel_requires_scope_supervisor_and_fresh_auth_then_releases_case",
+      "class": "tests.test_action_integrity",
+      "seconds": 43.633
+    },
+    {
+      "name": "test_proposer_can_cancel_pending_but_not_another_analysts_proposal",
+      "class": "tests.test_action_integrity",
+      "seconds": 26.59
+    },
+    {
+      "name": "test_worker_refreshes_cached_approval_after_cancellation",
+      "class": "tests.test_action_integrity",
+      "seconds": 29.686
+    },
+    {
+      "name": "test_cancellation_racing_execution_has_one_winner",
+      "class": "tests.test_action_integrity",
+      "seconds": 35.024
+    },
+    {
+      "name": "test_database_rejects_action_tampering_and_unapproved_receipts",
+      "class": "tests.test_action_integrity",
+      "seconds": 27.03
+    },
+    {
+      "name": "test_worker_refuses_stale_evidence_and_supervisor_can_recover",
+      "class": "tests.test_action_integrity",
+      "seconds": 32.32
+    },
+    {
+      "name": "test_execution_status_distinguishes_waiting_failure_and_cancellation",
+      "class": "tests.test_action_integrity",
+      "seconds": 36.989
+    },
+    {
+      "name": "test_rate_limit_is_durable_across_application_instances",
+      "class": "tests.test_recovery",
+      "seconds": 30.976
+    },
+    {
+      "name": "test_unknown_session_cannot_fill_rate_limit_storage",
+      "class": "tests.test_completion",
+      "seconds": 8.873
+    }
+  ],
+  "limits": [
+    "Synthetic JWT identities; not real-user Supabase sign-in/MFA acceptance",
+    "Simulation scoring; not trained ML quality validation",
+    "Simulated financial actions; no bank integration",
+    "Targeted acceptance suite; prior full suite has separate evidence"
+  ]
+}

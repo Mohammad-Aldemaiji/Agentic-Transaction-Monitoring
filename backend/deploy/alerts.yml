@@ -1,0 +1,44 @@
+groups:
+  - name: local-demo
+    rules:
+      - alert: BackendProcessUnavailable
+        expr: up{job=~"atm-.*"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "A backend metrics process is unreachable"
+      - alert: WorkerStalled
+        expr: time() - atm_worker_last_success_timestamp_seconds{job="atm-worker"} > 60
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Worker has not completed a storage cycle for over a minute"
+      - alert: QueueMetricsStale
+        expr: time() - atm_queue_sample_timestamp_seconds{job="atm-worker"} > 60
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: "Queue statistics are stale; do not treat old values as current"
+      - alert: ProcessingNeedsReview
+        expr: atm_jobs{job="atm-worker",state="FAILED"} > 0
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: "Failed work needs review; disabled scoring intentionally creates these jobs"
+      - alert: ReadyQueueDelayed
+        expr: atm_oldest_ready_job_seconds{job="atm-worker"} > 60
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: "Runnable work has waited longer than a minute"
+      - alert: ApiServerErrors
+        expr: sum(increase(atm_http_responses_total{job="atm-api",status=~"5.."}[5m])) >= 3
+        labels:
+          severity: warning
+        annotations:
+          summary: "At least three backend server errors occurred in five minutes"

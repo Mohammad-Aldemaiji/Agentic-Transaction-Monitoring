@@ -1,0 +1,17 @@
+CREATE INDEX ix_atm_cases_assigned_to ON atm.cases (assigned_to);
+CREATE INDEX ix_atm_model_versions_registered_by ON atm.model_versions (registered_by);
+CREATE INDEX ix_atm_risk_policies_approved_by ON atm.risk_policies (approved_by);
+CREATE INDEX ix_atm_risk_policies_created_by ON atm.risk_policies (created_by);
+CREATE INDEX ix_atm_decisions_reviewer_id ON atm.decisions (reviewer_id);
+CREATE INDEX ix_atm_drift_reports_model_id ON atm.drift_reports (model_id);
+CREATE INDEX ix_atm_notes_author_id ON atm.notes (author_id);
+CREATE INDEX ix_atm_proposals_proposer_id ON atm.proposals (proposer_id);
+CREATE INDEX ix_atm_proposals_approver_id ON atm.proposals (approver_id);
+CREATE INDEX ix_atm_training_requests_requested_by ON atm.training_requests (requested_by);
+CREATE INDEX ix_atm_training_requests_model_id ON atm.training_requests (model_id);
+CREATE INDEX IF NOT EXISTS ix_backend_alerts_account_id ON public.alerts (account_id);
+CREATE INDEX IF NOT EXISTS ix_backend_decisions_reviewer_id ON public.decisions (reviewer_id);
+CREATE INDEX IF NOT EXISTS ix_backend_decisions_supersedes ON public.decisions (supersedes);
+CREATE INDEX IF NOT EXISTS ix_backend_scores_model_version ON public.scores (model_version);
+CREATE INDEX IF NOT EXISTS ix_backend_threshold_sets_activated_by ON public.threshold_sets (activated_by);
+UPDATE atm.alembic_version SET version_num='0005';

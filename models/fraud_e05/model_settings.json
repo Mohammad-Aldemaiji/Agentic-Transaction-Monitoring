@@ -1,0 +1,5 @@
+{
+  "alerts_per_day": 6,
+  "threshold": 0.010229046456515789,
+  "eval_set": "val"
+}

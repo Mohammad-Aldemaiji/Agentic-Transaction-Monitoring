@@ -1,0 +1,21 @@
+FROM golang:1.27.3-alpine@sha256:b8c9b82affbbb82a020bbcf998dad2ba9516944ac7e883524642a481a9505e9c AS builder
+ADD --checksum=sha256:d6383dea2f9b26c1673a52859c453653f2c6c046f7fb6d01db59603a65a732eb https://codeload.github.com/prometheus/prometheus/tar.gz/refs/tags/v3.15.0 /source.tar.gz
+RUN mkdir /source && tar -xzf /source.tar.gz -C /source --strip-components=1
+WORKDIR /source
+ENV GOMAXPROCS=2 GOMEMLIMIT=768MiB
+RUN go get golang.org/x/net@v0.60.0 && \
+    CGO_ENABLED=0 go build -p 1 -trimpath -tags netgo \
+      -ldflags='-s -w -X github.com/prometheus/common/version.Version=3.15.0-local-security1' \
+      -o /out/prometheus ./cmd/prometheus && \
+    CGO_ENABLED=0 go build -p 1 -trimpath -tags netgo -ldflags='-s -w' \
+      -o /out/promtool ./cmd/promtool
+
+RUN CGO_ENABLED=0 go list -deps -tags netgo ./cmd/prometheus ./cmd/promtool > /build-dependencies.txt
+
+FROM prom/prometheus:v3.15.0@sha256:efd719c99d83b060d9daefdcf00360461adf279f45ef5391f8d111892118753e
+# The local presentation page is served by Caddy. Only Prometheus's JSON API is
+# exposed through that authenticated gateway; built-in UI assets are not needed.
+COPY --from=builder /out/prometheus /bin/prometheus
+COPY --from=builder /out/promtool /bin/promtool
+
+COPY --from=builder /build-dependencies.txt /usr/share/atm/build-dependencies.txt

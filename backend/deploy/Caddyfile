@@ -1,0 +1,85 @@
+{
+    admin off
+    auto_https off
+    persist_config off
+    servers {
+        timeouts {
+            read_header 5s
+            read_body 10s
+            write 160s
+            idle 30s
+        }
+        max_header_size 16KB
+        protocols h1 h2
+        strict_sni_host
+    }
+}
+
+(local_tls) {
+    tls /run/secrets/local_cert /run/secrets/local_key {
+        protocols tls1.2 tls1.3
+    }
+    header {
+        -Server
+        Strict-Transport-Security "max-age=86400"
+        X-Content-Type-Options nosniff
+        Referrer-Policy no-referrer
+        X-Frame-Options DENY
+    }
+}
+
+https://localhost:8443 {
+    import local_tls
+    request_body {
+        max_size 128KB
+    }
+    @local_ai path /api/v1/cases/*/agent-analysis /api/v1/calls/*/transcribe
+    handle @local_ai {
+        reverse_proxy api:8000 {
+            header_up -Forwarded
+            transport http {
+                dial_timeout 3s
+                response_header_timeout 150s
+            }
+        }
+    }
+    @backend path /api/* /health/*
+    handle @backend {
+        reverse_proxy api:8000 {
+            header_up -Forwarded
+            transport http {
+                dial_timeout 3s
+                response_header_timeout 20s
+            }
+        }
+    }
+    handle {
+        root * /srv/app
+        header {
+            Cache-Control no-store
+            Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self' https://yxcysaudekjhtsqoqghd.supabase.co; img-src 'self' data:; media-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'"
+        }
+        try_files {path} /index.html
+        file_server
+    }
+}
+
+https://localhost:9443 {
+    import local_tls
+    import /run/secrets/monitor_auth
+    header {
+        Cache-Control no-store
+        Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+    }
+    handle /api/v1/* {
+        @read method GET
+        handle @read {
+            reverse_proxy prometheus:9090
+        }
+        respond 405
+    }
+    handle {
+        root * /srv/monitor
+        file_server
+    }
+}

@@ -1,0 +1,65 @@
+[project]
+name = "atm-backend"
+version = "0.1.0"
+description = "Synthetic transaction monitoring: secure API and durable workflows"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+  "fastapi>=0.115,<1",
+  "uvicorn>=0.34,<1",
+  "pydantic-settings>=2.8,<3",
+  "sqlalchemy>=2.0.40,<2.1",
+  "psycopg[binary]>=3.2,<4",
+  "pyjwt[crypto]>=2.10,<3",
+  "httpx>=0.28,<1",
+  "certifi>=2026.10.19",
+  "prometheus-client>=0.24,<1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3,<10",
+    "ruff>=0.11,<1",
+    "mypy>=1.15,<2",
+    "hypothesis>=6.130,<7",
+    "pip-audit>=2.8,<3",
+    "bandit>=1.8,<2",
+]
+
+[project.optional-dependencies]
+local-ai = [
+  "pandas>=2.2,<4", "numpy>=2,<3", "xgboost==3.4.1",
+  "piper-tts>=1.3,<2", "faster-whisper>=1.1,<2",
+]
+
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.uv]
+# GHSA-6q48-6c7w-9gw2: exclude the compromised CA bundle transitively used by HTTP clients.
+constraint-dependencies = ["certifi>=2026.10.19"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["atm_backend.e05_model"]
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = ["pandas.*", "numpy.*", "xgboost.*", "piper.*", "faster_whisper.*", "av.*"]
+ignore_missing_imports = true
+

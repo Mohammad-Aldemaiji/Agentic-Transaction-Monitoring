@@ -36,12 +36,22 @@ dashboard/dist/
 # E05 fraud model: small enough to keep in Git so the agent can load it
 !models/fraud_e05/
 !models/fraud_e05/*.pkl
+!models/fraud_e05/*.json
 
 # agent voice cache
 tts_cache/
 
-# local voice files (download with piper.download_voices)
-src/agent/voices/
+# Backend runtime credentials and generated local data
+.runtime/
+.env.*
+!.env.example
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.hypothesis/
+*.egg-info/
+backend/dist/
+backend/test-results*.xml
+supabase/.temp/
 
-# build caches
-*.tsbuildinfo
+frontend/dist/

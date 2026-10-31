@@ -1,0 +1,14 @@
+{
+  "recorded_at": "2026-10-22T17:12:43.355138+00:00",
+  "scope": "100 synthetic transactions, test authentication, real Supabase atm_test; no ML",
+  "transactions": 100,
+  "database_statements": 7,
+  "acceptance_seconds": 7.882619875017554,
+  "acceptance_transactions_per_second": 12.686137551416218,
+  "retry_durable_counts": {
+    "transactions": 100,
+    "jobs": 100,
+    "audit": 100
+  },
+  "limitations": "One bounded batch; not sustained throughput or end-to-end scoring latency"
+}

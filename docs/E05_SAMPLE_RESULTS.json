@@ -1,0 +1,240 @@
+{
+  "scope": "Synthetic, fraud-enriched sample; not a population estimate or deployment approval.",
+  "model_digest": "6512d82e462d6ce62dcb65e5ec03f8fc8c2edd92b6a6538ebb63e95a4b7c3d13",
+  "data_digest": "83995bd946c7bbfe7d8aff401b79bf3cc2476463ef6898ce722500415bda31e2",
+  "rows": 35828,
+  "accounts": 2390,
+  "sample_fraud": 1305,
+  "test_period_rows": 6676,
+  "eligibility": "Approved SAR payments on supported channels only.",
+  "validation_period": "2026-07-17 through 2026-08-10 UTC",
+  "test_period": "2026-08-12 through 2026-09-30 UTC",
+  "policy": "Validation-only threshold: recall >=85%, false-positive rate <=2%; maximize sample precision. Otherwise maximize recall below the false- positive limit.",
+  "validation": {
+    "baseline": {
+      "transactions": 1456,
+      "fraud": 67,
+      "caught": 57,
+      "missed": 10,
+      "false_alarms": 4,
+      "true_negatives": 1385,
+      "recall": 0.8507462686567164,
+      "precision": 0.9344262295081968,
+      "false_positive_rate": 0.0028797696184305254,
+      "threshold": 0.010229046456515789
+    },
+    "candidate": {
+      "transactions": 1456,
+      "fraud": 67,
+      "caught": 59,
+      "missed": 8,
+      "false_alarms": 4,
+      "true_negatives": 1385,
+      "recall": 0.8805970149253731,
+      "precision": 0.9365079365079365,
+      "false_positive_rate": 0.0028797696184305254,
+      "threshold": 0.009138399735093117
+    }
+  },
+  "test": {
+    "baseline": {
+      "transactions": 2899,
+      "fraud": 135,
+      "caught": 87,
+      "missed": 48,
+      "false_alarms": 10,
+      "true_negatives": 2754,
+      "recall": 0.6444444444444445,
+      "precision": 0.8969072164948454,
+      "false_positive_rate": 0.00361794500723589,
+      "threshold": 0.010229046456515789
+    },
+    "candidate": {
+      "transactions": 2899,
+      "fraud": 135,
+      "caught": 91,
+      "missed": 44,
+      "false_alarms": 11,
+      "true_negatives": 2753,
+      "recall": 0.674074074074074,
+      "precision": 0.8921568627450981,
+      "false_positive_rate": 0.003979739507959479,
+      "threshold": 0.009138399735093117
+    }
+  },
+  "candidate_improves_target": true,
+  "limitations": [
+    "This sample has 1,305 fraud labels, the same count reported for the 746,698-row source; sampling probabilities are unknown.",
+    "Precision, alert counts and aggregate accuracy cannot be extrapolated to real traffic.",
+    "The original training rows and exact split timestamps are unavailable; held-out status is inferred from the saved notebook dates, not independently proven.",
+    "This study changes only the decision threshold, not the trained weights. Any further tuning requires a new untouched test set.",
+    "Dataset history is incomplete. Precomputed behavioral features may summarize transactions absent from this sample.",
+    "Customer demos are deliberately selected examples, not additional evaluation evidence."
+  ],
+  "fraud_types": {
+    "ACCOUNT_TAKEOVER": {
+      "baseline": {
+        "transactions": 15,
+        "fraud": 15,
+        "caught": 8,
+        "missed": 7,
+        "false_alarms": 0,
+        "true_negatives": 0,
+        "recall": 0.5333333333333333,
+        "precision": 1.0,
+        "false_positive_rate": 0.0,
+        "threshold": 0.010229046456515789
+      },
+      "candidate": {
+        "transactions": 15,
+        "fraud": 15,
+        "caught": 8,
+        "missed": 7,
+        "false_alarms": 0,
+        "true_negatives": 0,
+        "recall": 0.5333333333333333,
+        "precision": 1.0,
+        "false_positive_rate": 0.0,
+        "threshold": 0.009138399735093117
+      }
+    },
+    "APP_SOCIAL_ENGINEERING": {
+      "baseline": {
+        "transactions": 46,
+        "fraud": 46,
+        "caught": 41,
+        "missed": 5,
+        "false_alarms": 0,
+        "true_negatives": 0,
+        "recall": 0.8913043478260869,
+        "precision": 1.0,
+        "false_positive_rate": 0.0,
+        "threshold": 0.010229046456515789
+      },
+      "candidate": {
+        "transactions": 46,
+        "fraud": 46,
+        "caught": 43,
+        "missed": 3,
+        "false_alarms": 0,
+        "true_negatives": 0,
+        "recall": 0.9347826086956522,
+        "precision": 1.0,
+        "false_positive_rate": 0.0,
+        "threshold": 0.009138399735093117
+      }
+    },
+    "CARD_TESTING": {
+      "baseline": {
+        "transactions": 13,
+        "fraud": 13,
+        "caught": 11,
+        "missed": 2,
+        "false_alarms": 0,
+        "true_negatives": 0,
+        "recall": 0.8461538461538461,
+        "precision": 1.0,
+        "false_positive_rate": 0.0,
+        "threshold": 0.010229046456515789
+      },
+      "candidate": {
+        "transactions": 13,
+        "fraud": 13,
+        "caught": 11,
+        "missed": 2,
+        "false_alarms": 0,
+        "true_negatives": 0,
+        "recall": 0.8461538461538461,
+        "precision": 1.0,
+        "false_positive_rate": 0.0,
+        "threshold": 0.009138399735093117
+      }
+    },
+    "CNP_FRAUD_BURST": {
+      "baseline": {
+        "transactions": 21,
+        "fraud": 21,
+        "caught": 12,
+        "missed": 9,
+        "false_alarms": 0,
+        "true_negatives": 0,
+        "recall": 0.5714285714285714,
+        "precision": 1.0,
+        "false_positive_rate": 0.0,
+        "threshold": 0.010229046456515789
+      },
+      "candidate": {
+        "transactions": 21,
+        "fraud": 21,
+        "caught": 13,
+        "missed": 8,
+        "false_alarms": 0,
+        "true_negatives": 0,
+        "recall": 0.6190476190476191,
+        "precision": 1.0,
+        "false_positive_rate": 0.0,
+        "threshold": 0.009138399735093117
+      }
+    },
+    "FIRST_PARTY_BUST_OUT": {
+      "baseline": {
+        "transactions": 40,
+        "fraud": 40,
+        "caught": 15,
+        "missed": 25,
+        "false_alarms": 0,
+        "true_negatives": 0,
+        "recall": 0.375,
+        "precision": 1.0,
+        "false_positive_rate": 0.0,
+        "threshold": 0.010229046456515789
+      },
+      "candidate": {
+        "transactions": 40,
+        "fraud": 40,
+        "caught": 16,
+        "missed": 24,
+        "false_alarms": 0,
+        "true_negatives": 0,
+        "recall": 0.4,
+        "precision": 1.0,
+        "false_positive_rate": 0.0,
+        "threshold": 0.009138399735093117
+      }
+    }
+  },
+  "customers": [
+    {
+      "name": "Sample customer 1",
+      "account_id": "SA41B10007000001686",
+      "scenario": "Ordinary activity",
+      "transactions": 552,
+      "fraud": 0,
+      "evaluated": 5
+    },
+    {
+      "name": "Sample customer 2",
+      "account_id": "SA90B10007000000636",
+      "scenario": "Ordinary activity",
+      "transactions": 523,
+      "fraud": 0,
+      "evaluated": 4
+    },
+    {
+      "name": "Sample customer 3",
+      "account_id": "SA15B10007000000634",
+      "scenario": "History containing labelled fraud",
+      "transactions": 37,
+      "fraud": 19,
+      "evaluated": 13
+    },
+    {
+      "name": "Sample customer 4",
+      "account_id": "SA44B10007000002329",
+      "scenario": "History containing labelled fraud",
+      "transactions": 25,
+      "fraud": 17,
+      "evaluated": 11
+    }
+  ]
+}
