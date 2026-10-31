@@ -1,0 +1,14 @@
+{
+  "recorded_at": "2026-10-24T12:36:15.193500+00:00",
+  "module_count": 22,
+  "services": {
+    "api": {
+      "image_id": "sha256:fbb801fc1c5cb0444d6991a4aae3d92b4f84bcd025bca46b8e32d5c477756daf",
+      "all_modules_match": true
+    },
+    "worker": {
+      "image_id": "sha256:b3b70b75c27f8f3ad8a49ddc0dd309c50365cefe6a4e7e1a1fe2d7d0b9e910ca",
+      "all_modules_match": true
+    }
+  }
+}

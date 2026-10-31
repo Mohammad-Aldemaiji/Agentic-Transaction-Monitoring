@@ -39,3 +39,7 @@ flagged = scores >= settings["threshold"]
 gives wrong scores without raising an error.
 
 Only load `.pkl` files from inside the team. Loading a pickle can run code.
+
+## Integrated backend metadata
+
+`model_columns.json` and `model_settings.json` are equivalent JSON conversions of the existing metadata. The integrated backend uses these with the existing model JSON, so runtime scoring does not unpickle files. `backend/scripts/e05_sample.py` prints the digest of all three artifacts and a held-out replay payload. See `docs/LOCAL_AI_INTEGRATION.md` for the deliberately limited synthetic replay contract.

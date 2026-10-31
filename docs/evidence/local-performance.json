@@ -1,0 +1,46 @@
+{
+  "date": "2026-10-17T19:16:05.772936+00:00",
+  "scope": "Local TLS test server, real Supabase atm_test commits, test identities, simulated scoring; does not measure real Supabase login, genuine ML or Caddy overhead",
+  "ingestion": [
+    {
+      "requests": 15,
+      "concurrency": 1,
+      "errors": 0,
+      "elapsed_seconds": 33.59,
+      "requests_per_second": 0.447,
+      "p50_ms": 2066.24,
+      "p95_ms": 2894.05,
+      "max_ms": 2894.05
+    },
+    {
+      "requests": 15,
+      "concurrency": 3,
+      "errors": 0,
+      "elapsed_seconds": 12.52,
+      "requests_per_second": 1.198,
+      "p50_ms": 2085.89,
+      "p95_ms": 4061.03,
+      "max_ms": 4061.03
+    },
+    {
+      "requests": 15,
+      "concurrency": 5,
+      "errors": 0,
+      "elapsed_seconds": 8.198,
+      "requests_per_second": 1.83,
+      "p50_ms": 2014.64,
+      "p95_ms": 4165.03,
+      "max_ms": 4165.03
+    }
+  ],
+  "processing": {
+    "jobs": 45,
+    "seconds": 148.473,
+    "scorer": "simulation; measures queue/feature/database work only"
+  },
+  "durability": {
+    "transactions": 45,
+    "scored": 45,
+    "failed_jobs": 0
+  }
+}

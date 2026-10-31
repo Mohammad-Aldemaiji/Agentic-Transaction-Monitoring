@@ -1,0 +1,57 @@
+name: Backend verification
+on:
+  push:
+    paths: ["backend/**", "supabase/**", "docker-compose.yml", ".github/workflows/backend.yml"]
+  pull_request:
+    paths: ["backend/**", "supabase/**", "docker-compose.yml", ".github/workflows/backend.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.13"
+          python-version: "3.12"
+      - run: uv sync --project backend --frozen --extra local-ai
+      - working-directory: backend
+        run: |
+          .venv/bin/ruff check src tests scripts
+          .venv/bin/ruff format --check src tests scripts
+          .venv/bin/mypy src
+          .venv/bin/pytest -q tests/test_configuration.py tests/test_provisioning.py tests/test_scoring_contract.py tests/test_local_operations.py
+          .venv/bin/bandit -q -r src
+          .venv/bin/pip-audit --skip-editable --progress-spinner off
+      - run: docker build -t atm-backend backend
+      - run: docker run --rm --network none atm-backend python -c 'from atm_backend.voice import introduction; from atm_backend.services import INTRO; assert all(introduction(k,v).startswith(b"RIFF") for k,v in INTRO.items())'
+  supabase-integration:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: supabase-integration
+    concurrency: supabase-isolated-tests
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.13"
+          python-version: "3.12"
+      - run: uv sync --project backend --frozen --extra local-ai
+      - name: Prepare isolated Supabase credentials
+        env:
+          ATM_TEST_MIGRATION_URL: ${{ secrets.ATM_TEST_MIGRATION_URL }}
+          ATM_TEST_DATABASE_URL: ${{ secrets.ATM_TEST_DATABASE_URL }}
+        run: |
+          mkdir -m 700 .runtime
+          curl --fail --silent --show-error https://supabase-downloads.s3-ap-southeast-1.amazonaws.com/prod/ssl/prod-ca-2021.crt -o .runtime/supabase-ca.pem
+          backend/.venv/bin/python backend/scripts/ci_test_environment.py
+      - run: backend/.venv/bin/python backend/scripts/check.py
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-results
+          path: backend/test-results.xml

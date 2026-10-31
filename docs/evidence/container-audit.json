@@ -1,0 +1,66 @@
+{
+  "recorded_at": "2026-10-20T20:45:14.091230+00:00",
+  "scanner": "Trivy 0.76.0",
+  "scope": "Exported final local images; no Docker socket or runtime secrets mounted",
+  "images": [
+    {
+      "service": "api",
+      "image_id": "sha256:0bcd1b64c7f11b9aebae3df867f3610ed7f0f6ffc88c64dc0ca67193d55e0f9a",
+      "scanned_at": "2026-10-20T20:43:09.138507172Z",
+      "raw_severity_counts": {},
+      "findings": []
+    },
+    {
+      "service": "gateway",
+      "image_id": "sha256:6669504b101f720e38a92f6b433ca2426efee5d61739cb60bddd259600ad8309",
+      "scanned_at": "2026-10-20T11:55:33.982942962Z",
+      "raw_severity_counts": {
+        "UNKNOWN": 1
+      },
+      "findings": [
+        {
+          "id": "GO-2026-5932",
+          "package": "golang.org/x/crypto",
+          "version": "v0.57.0",
+          "severity": "UNKNOWN",
+          "fixed_version": null,
+          "assessment": "Affected OpenPGP packages absent from compiled dependency graph",
+          "source": "https://pkg.go.dev/vuln/GO-2026-5932"
+        }
+      ],
+      "build_dependencies_sha256": "4a0e535126c3e23d571895fc357e3c1372adecaf0f34ae04b0fad547e0b8cf9a",
+      "build_dependencies_file": "gateway-build-dependencies.txt"
+    },
+    {
+      "service": "prometheus",
+      "image_id": "sha256:ae7a3cc3281c01e011f7a85042885639f5ac99a4a02132df1bdabb0cf5477d67",
+      "scanned_at": "2026-10-20T20:36:16.327203879Z",
+      "raw_severity_counts": {
+        "UNKNOWN": 2
+      },
+      "findings": [
+        {
+          "id": "GO-2026-5932",
+          "package": "golang.org/x/crypto",
+          "version": "v0.57.0",
+          "severity": "UNKNOWN",
+          "fixed_version": null,
+          "assessment": "Affected OpenPGP packages absent from compiled dependency graph",
+          "source": "https://pkg.go.dev/vuln/GO-2026-5932"
+        },
+        {
+          "id": "GO-2026-5932",
+          "package": "golang.org/x/crypto",
+          "version": "v0.57.0",
+          "severity": "UNKNOWN",
+          "fixed_version": null,
+          "assessment": "Affected OpenPGP packages absent from compiled dependency graph",
+          "source": "https://pkg.go.dev/vuln/GO-2026-5932"
+        }
+      ],
+      "build_dependencies_sha256": "206ce55ddb3a931bcd7757ed7c26f82fe7ea8f55883b823eea37491a8b6e32f0",
+      "build_dependencies_file": "prometheus-build-dependencies.txt"
+    }
+  ],
+  "limitations": "Known-vulnerability scans plus package-reachability triage; not independent penetration testing or proof of absence of vulnerabilities. Runtime credentials and managed Supabase are outside these image scans."
+}

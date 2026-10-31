@@ -1,0 +1,9 @@
+{
+  "archive": ".runtime/backups/atm-pre-upgrade-20261022T171007Z.dump",
+  "bytes": 76817,
+  "sha256": "a1f55abe1a187a6a536ed6337ba4878d410b8ae58d78dfd367ffe7a8fc0eb31a",
+  "scope": "atm application schema only; excludes provider Auth, legacy public tables and test schema",
+  "archive_decode_verified": true,
+  "custom_roles_use_scram_sha_256": true,
+  "restore_test_performed": false
+}

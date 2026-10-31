@@ -1,0 +1,108 @@
+{
+  "$defs": {
+    "Contribution": {
+      "additionalProperties": false,
+      "properties": {
+        "feature": {
+          "maxLength": 100,
+          "minLength": 1,
+          "title": "Feature",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "number"
+        },
+        "direction": {
+          "enum": [
+            "increases_risk",
+            "decreases_risk"
+          ],
+          "title": "Direction",
+          "type": "string"
+        },
+        "magnitude": {
+          "minimum": 0,
+          "title": "Magnitude",
+          "type": "number"
+        }
+      },
+      "required": [
+        "feature",
+        "value",
+        "direction",
+        "magnitude"
+      ],
+      "title": "Contribution",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "transaction_id": {
+      "format": "uuid",
+      "title": "Transaction Id",
+      "type": "string"
+    },
+    "feature_version": {
+      "const": "account-windows-v1",
+      "title": "Feature Version",
+      "type": "string"
+    },
+    "model_version": {
+      "maxLength": 100,
+      "minLength": 1,
+      "title": "Model Version",
+      "type": "string"
+    },
+    "model_digest": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Model Digest",
+      "type": "string"
+    },
+    "supervised_probability": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Supervised Probability",
+      "type": "number"
+    },
+    "anomaly_score": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Anomaly Score",
+      "type": "number"
+    },
+    "risk_score": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Risk Score",
+      "type": "number"
+    },
+    "requires_review": {
+      "title": "Requires Review",
+      "type": "boolean"
+    },
+    "contributions": {
+      "items": {
+        "$ref": "#/$defs/Contribution"
+      },
+      "maxItems": 5,
+      "minItems": 5,
+      "title": "Contributions",
+      "type": "array"
+    }
+  },
+  "required": [
+    "transaction_id",
+    "feature_version",
+    "model_version",
+    "model_digest",
+    "supervised_probability",
+    "anomaly_score",
+    "risk_score",
+    "requires_review",
+    "contributions"
+  ],
+  "title": "ProviderResult",
+  "type": "object"
+}

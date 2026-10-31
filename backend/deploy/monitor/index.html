@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Transaction Monitor · System health</title>
+  <link rel="stylesheet" href="/style.css"><script defer src="/app.js"></script>
+</head>
+<body>
+  <header><div class="brand"><span class="mark">TM</span> Transaction Monitor</div><span class="badge">LOCAL DEMONSTRATION</span></header>
+  <main>
+    <div class="intro"><div><p class="eyebrow">OPERATIONS</p><h1>System health</h1><p class="muted">A live view of the backend powering transaction review.</p></div><p id="updated" class="muted" role="status">Connecting…</p></div>
+    <div id="connection" class="notice" hidden>Monitoring is unavailable. Values below may be out of date.</div>
+    <section class="cards" aria-label="Service status">
+      <article><p>API process</p><h2 id="api">—</h2><small>Receives and validates requests</small></article>
+      <article><p>Background worker</p><h2 id="worker">—</h2><small>Processes jobs and checks timeouts</small></article>
+      <article><p>Database access</p><h2 id="database">—</h2><small>Latest successful Supabase access</small></article>
+      <article><p>Waiting jobs</p><h2 id="queued">—</h2><small>Includes scheduled retries</small></article>
+    </section>
+    <section class="panels">
+      <article class="panel"><div class="panel-heading"><div><h2>Request activity</h2><p class="muted">Requests per second · last 5 minutes</p></div><strong id="rate">—</strong></div><svg id="chart" viewBox="0 0 640 180" role="img" aria-label="Request activity over the last five minutes"><path id="area" class="area"/><path id="line" class="line"/></svg><div class="chart-caption"><span>5 minutes ago</span><span>Now</span></div></article>
+      <article class="panel"><h2>Response and processing</h2><dl><div><dt>95% of responses within</dt><dd id="latency">—</dd></div><div><dt>Oldest ready job</dt><dd id="age">—</dd></div><div><dt>Failed processing jobs</dt><dd id="failed">—</dd></div><div><dt>Server errors · last 5 minutes</dt><dd id="errors">—</dd></div></dl><p class="muted footnote">Disabled scoring creates failed scoring jobs and unscored review cases. A failed job is never a successful bank action.</p></article>
+    </section>
+    <section class="panel"><div class="panel-heading"><div><h2>Operational alerts</h2><p class="muted">Checks run every 15 seconds. Pending alerts are still being confirmed.</p></div><span id="alert-count" class="badge">—</span></div><ul id="alerts" aria-live="polite"><li>Waiting for monitoring data…</li></ul></section>
+    <footer>HTTPS on this computer · Existing Supabase database · Synthetic transactions and simulated bank actions<br>This page shows operational health, not fraud predictions or compliance certification.</footer>
+  </main>
+</body>
+</html>

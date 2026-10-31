@@ -1,0 +1,15 @@
+GRANT atm_test_owner TO postgres;
+SET LOCAL ROLE atm_test_owner;
+CREATE INDEX ix_atm_cases_assigned_to ON atm_test.cases (assigned_to);
+CREATE INDEX ix_atm_model_versions_registered_by ON atm_test.model_versions (registered_by);
+CREATE INDEX ix_atm_risk_policies_approved_by ON atm_test.risk_policies (approved_by);
+CREATE INDEX ix_atm_risk_policies_created_by ON atm_test.risk_policies (created_by);
+CREATE INDEX ix_atm_decisions_reviewer_id ON atm_test.decisions (reviewer_id);
+CREATE INDEX ix_atm_drift_reports_model_id ON atm_test.drift_reports (model_id);
+CREATE INDEX ix_atm_notes_author_id ON atm_test.notes (author_id);
+CREATE INDEX ix_atm_proposals_proposer_id ON atm_test.proposals (proposer_id);
+CREATE INDEX ix_atm_proposals_approver_id ON atm_test.proposals (approver_id);
+CREATE INDEX ix_atm_training_requests_requested_by ON atm_test.training_requests (requested_by);
+CREATE INDEX ix_atm_training_requests_model_id ON atm_test.training_requests (model_id);
+RESET ROLE;
+REVOKE atm_test_owner FROM postgres;
