@@ -42,7 +42,7 @@ class TokenVerifier:
         self.jwks = (
             PyJWKClient(
                 settings.jwks_url,
-                timeout=3,
+                timeout=15,
                 lifespan=300,
                 ssl_context=ssl.create_default_context(cafile=certifi.where()),
             )

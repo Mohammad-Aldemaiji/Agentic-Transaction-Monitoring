@@ -287,6 +287,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "team": a.team,
             "role": a.role,
             "booth_mode": cfg.environment == "booth",
+            "staff_access": getattr(app.state, "staff_access", False),
             "sample_traffic_enabled": request.app.state.settings.sample_traffic_enabled
             and a.role in ("analyst", "supervisor", "admin"),
         }
@@ -667,7 +668,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/api/v1/booth/config")
     def booth_config() -> dict[str, bool]:
-        return {"enabled": cfg.environment == "booth"}
+        return {
+            "enabled": cfg.environment == "booth",
+            "staff_access": getattr(app.state, "staff_access", False),
+        }
 
     if cfg.environment == "booth":
         from atm_backend.booth import register

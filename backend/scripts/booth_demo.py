@@ -14,7 +14,7 @@ import threading
 import time
 from datetime import timedelta
 from pathlib import Path
-from uuid import NAMESPACE_URL, uuid5
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 import psycopg
 import uvicorn
@@ -162,6 +162,9 @@ def initialize(values, cfg):
     with engine.begin() as c:
         c.execute(text("CREATE SCHEMA IF NOT EXISTS atm_booth"))
         Base.metadata.create_all(c)
+        from atm_backend.staff_access import StaffBase
+
+        StaffBase.metadata.create_all(c)
     with psycopg.connect(
         host="127.0.0.1", port=55439, dbname="atm_booth", user="postgres", password=values["owner"]
     ) as c:
@@ -299,8 +302,12 @@ def bootstrap(api, cfg):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=["serve", "prepare"])
+    parser.add_argument("action", choices=["serve", "prepare", "first-admin"])
+    parser.add_argument("--subject", type=UUID)
+    parser.add_argument("--email")
     args = parser.parse_args()
+    if args.action == "first-admin" and not (args.email and args.subject):
+        parser.error("Supply the verified provider account --subject and --email")
     os.umask(0o077)
     values = credentials()
     database_start(values)
@@ -308,6 +315,14 @@ def main():
     initialize(values, cfg)
     outer = create_app(cfg, ROOT / "frontend/dist")
     api = outer.app.api
+    if args.action == "first-admin":
+        from atm_backend.staff_access import provision_first_admin
+
+        provider = Settings(_env_file=ROOT / ".runtime/supabase-app.env")
+        with api.state.factory.begin() as session:
+            provision_first_admin(session, provider.issuer, args.subject, args.email)
+        print("First administrator verified in the local staff workspace.")
+        return
     api.state.booth_bootstrap = True
     try:
         bootstrap(api, cfg)
@@ -315,7 +330,7 @@ def main():
         api.state.booth_bootstrap = False
     if args.action == "prepare":
         return
-    from atm_backend.presenter_auth import install
+    from atm_backend.staff_access import install
 
     auth_cfg = Settings(_env_file=ROOT / ".runtime/supabase-app.env")
     connection = make_url(auth_cfg.database_url.get_secret_value())
@@ -325,7 +340,7 @@ def main():
         {"sslrootcert": str(ROOT / ".runtime/supabase-ca.pem")}
     )
     auth_cfg.database_url = SecretStr(connection.render_as_string(hide_password=False))
-    install(api, auth_cfg)
+    install(api, auth_cfg, ROOT / ".runtime/supabase-invite-key")
     outer.app.auth_origin = auth_cfg.issuer.removesuffix("/auth/v1")
     stopped = threading.Event()
     scorer = E05Scorer(cfg)

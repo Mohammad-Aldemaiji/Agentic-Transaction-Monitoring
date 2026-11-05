@@ -162,7 +162,7 @@ def register(app: FastAPI) -> None:
 
     @app.post("/api/v1/booth/feed", status_code=202)
     def feed(body: FeedInput, s: DB, a: Identity) -> dict[str, Any]:
-        a.require("ingestion")
+        a.require("admin" if getattr(app.state, "staff_access", False) else "ingestion")
         cfg = app.state.settings
         groups = cohort(str(cfg.e05_data_file), cfg.e05_data_digest)
         # Serialize concurrent feed clicks before choosing unreceived records.
@@ -181,13 +181,17 @@ def register(app: FastAPI) -> None:
             if len(records) == body.count:
                 break
         if records:
-            services.ingest_many(s, a, records)
+            services.ingest_many(
+                s, Actor(a.id, a.team, "ingestion", a.auth_time, a.request_id), records
+            )
         return {"accepted": len(records), "exhausted": len(records) < body.count}
 
     @app.post("/api/v1/booth/role")
     def role(body: RoleInput, request: Request, response: Response, s: DB) -> dict[str, Any]:
         if request.headers.get("origin") != "https://localhost:8555":
             raise Problem(403, "origin_denied")
+        if getattr(app.state, "staff_access", False):
+            raise Problem(404, "not_found")
         presenter = None
         if not getattr(app.state, "booth_bootstrap", False):
             sessions.authenticate(request, s)

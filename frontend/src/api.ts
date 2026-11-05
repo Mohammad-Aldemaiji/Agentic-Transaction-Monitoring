@@ -10,6 +10,17 @@ export class ApiError extends Error {
 }
 export function errorText(status: number, code: string) {
   const messages: Record<string, string> = {
+    cannot_reset_own_account:
+      "Use Forgot password on the sign-in page to reset your own password.",
+    cannot_change_own_access:
+      "You cannot change or delete your own administrator access.",
+    password_reset_not_confirmed:
+      "The user is enabled, but the reset email was not confirmed. Check Supabase Auth logs, then use Send password reset link to retry.",
+    invitations_not_configured: "The server needs its Supabase invitation key.",
+    invitation_not_confirmed:
+      "Delivery was not confirmed. Check the recipient address and Supabase Auth logs before retrying.",
+    user_already_registered:
+      "This email already has a staff record. Check the user list.",
     local_agent_disabled: "Local AI has not been enabled for this workspace.",
     local_agent_unavailable:
       "Local AI is unavailable or busy. You can continue reviewing the case manually.",
@@ -18,7 +29,7 @@ export function errorText(status: number, code: string) {
     local_transcription_unavailable:
       "This recording could not be transcribed. You can type your reply instead.",
     fresh_authentication_required:
-      "Please sign in again with your authenticator, then retry this approval.",
+      "Please sign in again with your authenticator, then retry this action.",
     independent_approval_required:
       "A different supervisor must approve this request.",
     identity_inactive:

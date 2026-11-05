@@ -5,11 +5,11 @@ An integrated senior-project workspace for synthetic bank transactions, supervis
 CS/IS/SE 499, Prince Sultan University, Semester 261. Supervisor: Dr. Tariq.
 Originated by Mohammad Aldemaiji; this version integrates his E05 model and local-agent approach with the team's monitored review workflow. See [attribution](ATTRIBUTION.md).
 
-**Review version: 31 October 2026.** This is a local research/presentation application, not a production banking deployment. No money is withdrawn, no real account is frozen, and no actual customer is called. Runtime credentials, local databases and downloaded AI/voice assets are not included.
+**Review version: 5 November 2026.** This is a local research/presentation application, not a production banking deployment. No money is withdrawn, no real account is frozen, and no actual customer is called. Runtime credentials, local databases and downloaded AI/voice assets are not included.
 
 ## What this version adds
 
-- React/TypeScript dashboard with Bank feed, Analyst, Supervisor and Administrator views.
+- React/TypeScript dashboard with individual Analyst, Supervisor and Administrator accounts. Administrators manage the synthetic bank feed.
 - FastAPI backend, durable PostgreSQL jobs, audit records, version checks, scoped evidence and duplicate protection.
 - Actual inference using the bundled supervised E05 XGBoost model, with explanations and recorded model/policy identities.
 - Synthetic customer histories, transaction JSON, configurable priorities and a review queue.
@@ -17,18 +17,19 @@ Originated by Mohammad Aldemaiji; this version integrates his E05 model and loca
 - Phone-style simulated verification: ringing, accept, confirm/deny keypad, unavailable/timeout outcomes and optional local speech.
 - Human proposals, independent supervisor approvals, simulated execution receipts and final case decisions.
 - Model/policy governance, reviewed-data exports and processing/recovery screens.
-- Real presenter sign-in with an authenticator code, followed by synthetic role switching. The presentation session lasts up to 24 hours, including idle time; signing out or provider/account revocation ends access earlier. Switching roles does not extend the deadline.
+- Supabase email/password sign-in and authenticator verification, with server-assigned staff roles. Local sessions last up to 24 hours, including idle time. Staff-management actions require verification within five hours.
+- Admin-only invitations, password reset emails, role changes, disable/enable, deletion and restoration. Access changes revoke sessions. Your own account controls are disabled and rejected by the server.
 
 ## Roles
 
 | Role | Purpose |
 |---|---|
-| Bank feed | Replay synthetic transactions and inspect customer histories and processing results. |
+| Bank feed (administrator function) | Replay synthetic transactions and inspect customer histories and processing results. |
 | Analyst | Investigate flagged cases, review evidence and AI advice, perform simulated verification, propose actions and record final decisions. |
 | Supervisor | Oversee cases and approve/reject eligible actions independently of the proposing analyst. |
-| Administrator | Manage policy/model proposals, reviewed datasets and operational processing. Administrator access does not imply supervisor approval authority. |
+| Administrator | Manage staff accounts, synthetic intake, policy/model proposals, reviewed datasets and operational processing. Administrator access does not imply supervisor approval authority. |
 
-In the presentation profile one authenticated presenter controls separate synthetic identities. This makes navigation convenient but does **not** prove independent approval by different people. Shared-workspace users retain their actual assigned roles.
+The local staff workspace uses one assigned role per account. Role-switching controls have been removed. Another administrator must change your role, disable or delete your account, or send you an administrative reset email. Personal password recovery remains available through Forgot password.
 
 ## Transaction workflow
 
@@ -68,7 +69,18 @@ Follow the [backend operating guide](docs/BACKEND_OPERATIONS.md) to apply the re
 
 Configure `frontend/.env.local` from [frontend/.env.example](frontend/.env.example) using your Supabase URL and publishable key. The frontend configuration is embedded at build time. Prepare your localhost certificate/key and private runtime files with the [local HTTPS guide](docs/LOCAL_DEMO.md); certificate trust requires an explicit local setup step. Keep the servers bound to localhost.
 
-For the isolated presentation workspace, after configuration and certificate setup:
+For the isolated staff workspace, after configuration and certificate setup:
+
+1. Configure Supabase Email authentication and SMTP. Disable public signups for invitation-only access.
+2. Set the Supabase Site URL to `https://localhost:8555` and add `https://localhost:8555/?account=setup` to allowed Redirect URLs. Email templates must preserve the provider confirmation link. Open local links on the machine running Rasid.
+3. Store the server-only Supabase secret/service-role key in ignored `.runtime/supabase-invite-key`, with permissions restricted to your operating-system user. Keep SMTP credentials in Supabase.
+4. Register and verify the first administrator in Supabase. Obtain its verified Auth user UUID through the operator dashboard. Bind it once using the command below, replacing both placeholders. This is an operator-only command and trusts the supplied identity. Existing staff records are not overwritten.
+
+```sh
+backend/.venv/bin/python backend/scripts/booth_demo.py first-admin --email ADMIN_EMAIL --subject VERIFIED_AUTH_USER_UUID
+```
+
+Start the application:
 
 ```sh
 docker pull postgres:17.7
@@ -76,7 +88,7 @@ npm --prefix frontend run build
 backend/.venv/bin/python backend/scripts/booth_demo.py serve
 ```
 
-Open **https://localhost:8555/** and sign in with an approved supervisor/administrator account and its authenticator code. The launcher starts its worker and initializes the synthetic identities, model and policy. PostgreSQL uses a dedicated `atm-booth-db` container and persistent `atm-booth-data` volume on loopback port 55439. Restarting retains records. Ctrl-C stops the application; do not delete the volume merely to stop it. See the [presentation walkthrough](docs/BOOTH_DEMO.md).
+Open **https://localhost:8555/** and sign in with your assigned staff account and its authenticator code. The launcher starts its worker and initializes the synthetic identities, model and policy. PostgreSQL uses a dedicated `atm-booth-db` container and persistent `atm-booth-data` volume on loopback port 55439. Restarting retains records. Ctrl-C stops the application; do not delete the volume merely to stop it. The [older presentation walkthrough](docs/BOOTH_DEMO.md) documents the previous role-switching version. Use this README for current account setup.
 
 For optional local AI, in another terminal:
 
@@ -96,13 +108,17 @@ Do not start a second Ollama server if the desktop service is already running. T
 
 ## Validation and known limitations
 
-Latest backend verification: **188 passed, 1 optional load test skipped**, across the main and configuration runs on 30 October. The latest frontend retry completed **29 tests**, with two worker-startup timeout errors; this is not a complete green frontend run. Earlier verification is recorded in the linked guides and is dated evidence, not a guarantee for every current scenario.
+Historical workflow verification: **188 passed, 1 optional load test skipped**, across the main and configuration runs on 30 October. The latest frontend retry completed **29 tests**, with two worker-startup timeout errors; this is not a complete green frontend run. Earlier verification is recorded in the linked guides and is dated evidence, not a guarantee for every current scenario.
 
 A live replay submitted 100 additional payments: 87 cleared and 13 flagged, with no pending/failed scoring jobs at observation. Investigation startup, customer-history filtering, transaction JSON and simulated call acceptance were exercised. The latest audit did not complete every role's entire workflow.
 
-Known issues for review:
+Staff-account verification on 5 November: six staff/presenter backend tests passed. The full frontend suite passed all 40 tests. Backend lint/format checks and staff-module type checks passed. Staff tests cover authorization, revocation, deletion/restoration, fresh reset requests, self-account protection and the five-hour verification window. The project owner confirmed receiving the real email and signing in with a newly created account. This is user-confirmed live evidence.
 
-- Presentation navigation exposes risk/model screens only to Administrator, while approval controls require Supervisor. This UI handoff needs correction before claiming complete governance coverage.
+Deleting a user retains an inactive audit record and the Supabase identity. Adding the same email restores the selected role and requests a fresh password setup email. Existing enabled users have a Send password reset link button. Email requests have a minimum 60-second retry interval and remain subject to provider limits. If delivery fails after restoration, the account is already restored; refresh the list and use the reset button after checking Auth logs.
+
+The staff directory and transaction history remain in the local Docker database. A Git clone does not transfer those records, SMTP settings, keys, or model downloads. Public/Windows hosting is pending preparation.
+
+Known issues for review:
 - `verify_booth.py` accepts authenticated session inputs but retains an incompatible initial unauthenticated `/me` assertion. Its older successful run predates presenter authentication; the current script needs updating.
 - Local Qwen can return contradictory reasoning and can time out on limited hardware. Human review is required. Real Whisper inference remains unverified.
 - Speech preparation may be slow; transcripts and response controls remain available when audio fails.

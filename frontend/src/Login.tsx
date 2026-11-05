@@ -12,9 +12,11 @@ import type { Identity } from "./types";
 export default function Login({
   onLogin,
   presentation = false,
+  staffAccess = false,
 }: {
   onLogin: (identity: Identity) => void;
   presentation?: boolean;
+  staffAccess?: boolean;
 }) {
   const [email, setEmail] = useState(""),
     [password, setPassword] = useState(""),
@@ -24,14 +26,16 @@ export default function Login({
     [needsEnrollment, setNeedsEnrollment] = useState(false);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState<unknown>(null);
-  const [register, setRegister] = useState(false),
-    [confirmation, setConfirmation] = useState(""),
-    [message, setMessage] = useState("");
+  const [message, setMessage] = useState("");
   async function finish(token: string) {
     let result: { csrf_token: string };
     try {
       result = await api<{ csrf_token: string }>(
-        presentation ? "/booth/session" : "/auth/session",
+        staffAccess
+          ? "/staff/session"
+          : presentation
+            ? "/booth/session"
+            : "/auth/session",
         {
           method: "POST",
           body: {},
@@ -65,22 +69,7 @@ export default function Login({
     setError(null);
     setMessage("");
     try {
-      if (register) {
-        if (password !== confirmation)
-          throw new Error("The passwords do not match.");
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: { emailRedirectTo: window.location.origin },
-        });
-        if (error) throw error;
-        setPassword("");
-        setConfirmation("");
-        setRegister(false);
-        setMessage(
-          "Check your email for the confirmation link, then return here and sign in. Creating an account does not grant access to transaction records.",
-        );
-      } else if (factor) {
+      if (factor) {
         const { data, error } = await supabase.auth.mfa.challengeAndVerify({
           factorId: factor,
           code,
@@ -165,22 +154,16 @@ export default function Login({
           </span>
           <div className="eyebrow">SECURE WORKSPACE</div>
           <h2>
-            {register
-              ? "Create your project account"
-              : factor
-                ? "Verify it’s you"
-                : needsEnrollment
-                  ? "Protect your account"
-                  : "Welcome back"}
+            {factor
+              ? "Verify it’s you"
+              : needsEnrollment
+                ? "Protect your account"
+                : "Welcome back"}
           </h2>
           <p>
-            {register
-              ? "Choose your own password. We will send you an email confirmation."
-              : factor
-                ? "Enter the six-digit code from your authenticator."
-                : presentation
-                  ? "Sign in once with your authenticator, then switch between Bank feed, Analyst, Supervisor and Administrator."
-                  : "Sign in to your transaction monitoring workspace."}
+            {factor
+              ? "Enter the six-digit code from your authenticator."
+              : "Sign in to your transaction monitoring workspace."}
           </p>
           <ErrorBox error={error} />
           {message && (
@@ -238,27 +221,13 @@ export default function Login({
                   <Field label="Password">
                     <input
                       type="password"
-                      autoComplete={
-                        register ? "new-password" : "current-password"
-                      }
-                      minLength={register ? 12 : undefined}
+                      autoComplete="current-password"
+
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                     />
                   </Field>
-                  {register && (
-                    <Field label="Confirm password">
-                      <input
-                        type="password"
-                        autoComplete="new-password"
-                        required
-                        minLength={12}
-                        value={confirmation}
-                        onChange={(e) => setConfirmation(e.target.value)}
-                      />
-                    </Field>
-                  )}
                 </>
               ) : (
                 <p>
@@ -298,32 +267,43 @@ export default function Login({
                 <button className="primary wide" type="submit">
                   {busy
                     ? "Verifying…"
-                    : register
-                      ? "Create account and send confirmation"
-                      : factor
-                        ? "Verify and continue"
-                        : "Continue securely"}
+                    : factor
+                      ? "Verify and continue"
+                      : "Continue securely"}
                   <ArrowRight size={18} />
                 </button>
               )}
             </fieldset>
           </form>
-          {!presentation && !factor && !needsEnrollment && (
+          {!factor && !needsEnrollment && (
             <button
               type="button"
-              disabled={busy}
               className="text-button"
-              onClick={() => {
-                setRegister(!register);
+              disabled={busy || !email}
+              onClick={async () => {
+                if (!supabase) return;
+                setBusy(true);
                 setError(null);
-                setMessage("");
-                setPassword("");
-                setConfirmation("");
+                try {
+                  const result = await supabase.auth.resetPasswordForEmail(
+                    email,
+                    { redirectTo: window.location.origin + "/?account=setup" },
+                  );
+                  if (result.error)
+                    throw new Error(
+                      "Password reset could not be requested. Please try again later.",
+                    );
+                  setMessage(
+                    "If this email has an account, you will receive a password reset link.",
+                  );
+                } catch (e) {
+                  setError(e);
+                } finally {
+                  setBusy(false);
+                }
               }}
             >
-              {register
-                ? "Already have an account? Sign in"
-                : "New to the project? Create an account"}
+              Forgot password?
             </button>
           )}
           {factor && (
