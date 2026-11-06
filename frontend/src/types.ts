@@ -6,6 +6,7 @@ export interface Identity {
   role: Role;
   sample_traffic_enabled?: boolean;
   booth_mode?: boolean;
+  staff_access?: boolean;
 }
 export interface Page<T> {
   items: T[];

@@ -2,7 +2,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 const mocks = vi.hoisted(() => ({
-  signUp: vi.fn(),
+  resetPasswordForEmail: vi.fn(),
   signInWithPassword: vi.fn(),
   listFactors: vi.fn(),
   challengeAndVerify: vi.fn(),
@@ -15,7 +15,7 @@ vi.mock("../src/auth", () => ({
   authConfigured: true,
   supabase: {
     auth: {
-      signUp: mocks.signUp,
+      resetPasswordForEmail: mocks.resetPasswordForEmail,
       signInWithPassword: mocks.signInWithPassword,
       getSession: mocks.getSession,
       mfa: {
@@ -43,50 +43,24 @@ async function credentials() {
     "synthetic-test-password",
   );
 }
-it("account creation sends only user-entered credentials and never assigns roles", async () => {
-  mocks.signUp.mockResolvedValue({ error: null });
-  const onLogin = vi.fn();
-  render(<Login onLogin={onLogin} />);
-  await userEvent.click(
-    screen.getByText("New to the project? Create an account"),
-  );
-  await credentials();
+it("offers recovery to a staff member without offering public registration", async () => {
+  mocks.resetPasswordForEmail.mockResolvedValue({ error: null });
+  render(<Login staffAccess onLogin={() => {}} />);
+  expect(screen.queryByText(/Create an account/i)).not.toBeInTheDocument();
   await userEvent.type(
-    screen.getByLabelText("Confirm password"),
-    "synthetic-test-password",
+    screen.getByLabelText("Email address"),
+    "staff@example.invalid",
   );
   await userEvent.click(
-    screen.getByRole("button", {
-      name: "Create account and send confirmation",
-    }),
+    screen.getByRole("button", { name: "Forgot password?" }),
   );
-  await screen.findByText(/Check your email for the confirmation link/);
-  expect(mocks.signUp).toHaveBeenCalledWith({
-    email: "student@example.invalid",
-    password: "synthetic-test-password",
-    options: { emailRedirectTo: window.location.origin },
-  });
-  expect(mocks.api).not.toHaveBeenCalled();
-  expect(onLogin).not.toHaveBeenCalled();
-  expect(screen.getByLabelText("Password", { exact: true })).toHaveValue("");
-});
-it("rejects mismatched new passwords before contacting the provider", async () => {
-  render(<Login onLogin={() => {}} />);
-  await userEvent.click(
-    screen.getByText("New to the project? Create an account"),
+  await screen.findByText(/If this email has an account/);
+  expect(mocks.resetPasswordForEmail).toHaveBeenCalledWith(
+    "staff@example.invalid",
+    {
+      redirectTo: window.location.origin + "/?account=setup",
+    },
   );
-  await credentials();
-  await userEvent.type(
-    screen.getByLabelText("Confirm password"),
-    "different-test-password",
-  );
-  await userEvent.click(
-    screen.getByRole("button", {
-      name: "Create account and send confirmation",
-    }),
-  );
-  await screen.findByText("The passwords do not match.");
-  expect(mocks.signUp).not.toHaveBeenCalled();
 });
 it("exchanges only the MFA-verified access token for a backend cookie session", async () => {
   mocks.signInWithPassword.mockResolvedValue({
@@ -105,7 +79,7 @@ it("exchanges only the MFA-verified access token for a backend cookie session", 
     .mockResolvedValueOnce({ csrf_token: "csrf-only" })
     .mockResolvedValueOnce({ id: "principal", role: "analyst", team: "demo" });
   const onLogin = vi.fn();
-  render(<Login onLogin={onLogin} />);
+  render(<Login staffAccess onLogin={onLogin} />);
   await credentials();
   await userEvent.click(
     screen.getByRole("button", { name: "Continue securely" }),
@@ -117,7 +91,7 @@ it("exchanges only the MFA-verified access token for a backend cookie session", 
     screen.getByRole("button", { name: "Verify and continue" }),
   );
   await waitFor(() => expect(onLogin).toHaveBeenCalled());
-  expect(mocks.api).toHaveBeenNthCalledWith(1, "/auth/session", {
+  expect(mocks.api).toHaveBeenNthCalledWith(1, "/staff/session", {
     method: "POST",
     body: {},
     bearer: "after-mfa",

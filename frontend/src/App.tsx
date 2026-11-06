@@ -12,17 +12,12 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import {
-  api,
-  clearSession,
-  hasSession,
-  label,
-  short,
-  rememberSession,
-} from "./api";
+import { api, clearSession, hasSession, label, short } from "./api";
 import { supabase } from "./auth";
 import { Brand, ErrorBox, Loading } from "./ui";
 import Login from "./Login";
+import StaffUsers from "./StaffUsers";
+import AccountSetup, { hasAccountSetup } from "./AccountSetup";
 import Queue from "./Queue";
 const CaseWorkspace = lazy(() => import("./CaseWorkspace"));
 import Transactions from "./Transactions";
@@ -33,6 +28,7 @@ import Governance, { AuditTrail, Operations } from "./Governance";
 const Models = lazy(() => import("./Models"));
 import type { Identity, Role } from "./types";
 export const navigation = [
+  { id: "users", name: "Users", icon: ShieldCheck, roles: ["admin"] },
   {
     id: "queue",
     name: "Review queue",
@@ -69,6 +65,8 @@ export const navigation = [
 export const allowedPages = (role: Role) =>
   navigation.filter((n) => n.roles.includes(role));
 export default function App() {
+  const [staffAccess, setStaffAccess] = useState(false);
+  const [accountSetup, setAccountSetup] = useState(hasAccountSetup);
   const [booth, setBooth] = useState<boolean | null>(null);
   const [identity, setIdentity] = useState<Identity | null>(null),
     [loading, setLoading] = useState(hasSession()),
@@ -79,9 +77,12 @@ export default function App() {
     [busy, setBusy] = useState(false);
   useEffect(() => {
     let live = true;
-    api<{ enabled: boolean }>("/booth/config")
+    api<{ enabled: boolean; staff_access?: boolean }>("/booth/config")
       .then((result) => {
-        if (live) setBooth(result.enabled);
+        if (live) {
+          setBooth(result.enabled);
+          setStaffAccess(result.staff_access === true);
+        }
       })
       .catch(() => {
         if (live) setBooth(false);
@@ -126,53 +127,14 @@ export default function App() {
       setBusy(false);
     }
   }
-  async function switchRole(role: Role) {
-    setBusy(true);
-    setError(null);
-    try {
-      const result = await api<{ identity: Identity; csrf_token: string }>(
-        "/booth/role",
-        { method: "POST", body: { role } },
-      );
-      rememberSession(result.csrf_token);
-      setIdentity(result.identity);
-      setPage(allowedPages(role)[0]?.id ?? "queue");
-      setCaseId("");
-    } catch (error) {
-      setError(error);
-    } finally {
-      setBusy(false);
-    }
-  }
-  const roleTabs = (
-    <div className="booth-toolbar" aria-label="Workspace role selection">
-      <div className="button-row">
-        {(
-          [
-            ["ingestion", "Bank feed"],
-            ["analyst", "Analyst"],
-            ["supervisor", "Supervisor"],
-            ["admin", "Administrator"],
-          ] as const
-        ).map(([role, name]) => (
-          <button
-            key={role}
-            className="secondary"
-            disabled={busy}
-            aria-pressed={identity?.role === role}
-            onClick={() => switchRole(role)}
-          >
-            {name}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
   if (loading || booth === null) return <Loading />;
+  if (accountSetup)
+    return <AccountSetup onDone={() => setAccountSetup(false)} />;
   if (!identity)
     return (
       <Login
         presentation={booth === true}
+        staffAccess={staffAccess}
         onLogin={(me) => {
           setIdentity(me);
           setPage(allowedPages(me.role)[0]?.id ?? "queue");
@@ -184,10 +146,10 @@ export default function App() {
     ? navigation
         .filter((n) =>
           n.id === "transactions"
-            ? ["ingestion", "analyst", "supervisor"].includes(identity.role)
-            : n.roles.includes(identity.role) &&
-              (!["policy", "models"].includes(n.id) ||
-                identity.role === "admin"),
+            ? ["ingestion", "analyst", "supervisor", "admin"].includes(
+                identity.role,
+              )
+            : n.roles.includes(identity.role),
         )
         .map((n) => ({
           ...n,
@@ -275,7 +237,6 @@ export default function App() {
         />
       )}
       <div className="main-shell">
-        {booth && roleTabs}
         <header className="topbar">
           <div>
             <button
@@ -300,19 +261,19 @@ export default function App() {
                 setIdentity(null);
                 setCaseId("");
               }}
-              title={
-                booth ? "Switch workspace role" : "Sign in again for recent MFA"
-              }
+              title="Sign in again for recent MFA"
             >
               <Settings2 size={16} />
-              {booth ? "Switch role" : "Re-authenticate"}
+              Re-authenticate
             </button>
           </div>
         </header>
         <main id="main" tabIndex={-1}>
           <ErrorBox error={error} />
           {identity.sample_traffic_enabled && !booth && <SampleTraffic />}
-          {selected.id === "queue" ? (
+          {selected.id === "users" ? (
+            <StaffUsers enabled={staffAccess} />
+          ) : selected.id === "queue" ? (
             caseId ? (
               <Suspense fallback={<Loading />}>
                 <CaseWorkspace
@@ -328,9 +289,11 @@ export default function App() {
           ) : selected.id === "transactions" ? (
             booth ? (
               <BoothFeed
-                readOnly={identity.role !== "ingestion"}
+                readOnly={
+                  identity.role !== (staffAccess ? "admin" : "ingestion")
+                }
                 openCase={
-                  identity.role === "ingestion"
+                  ["ingestion", "admin"].includes(identity.role)
                     ? undefined
                     : (id) => {
                         setCaseId(id);
