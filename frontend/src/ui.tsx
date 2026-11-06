@@ -159,6 +159,22 @@ export function useResource<T>(path: string | null, revision = 0) {
   }, [path, revision]);
   return { data: result?.path === path ? result.data : null, error, loading };
 }
+/** Ticks every `ms` while the page is visible, and once when it becomes visible again. */
+export function useLive(ms = 5000) {
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const bump = () => {
+      if (document.visibilityState !== "hidden") setTick((t) => t + 1);
+    };
+    const timer = setInterval(bump, ms);
+    document.addEventListener("visibilitychange", bump);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", bump);
+    };
+  }, [ms]);
+  return tick;
+}
 export function useAction(onSuccess?: () => void) {
   const [busy, setBusy] = useState(false),
     [error, setError] = useState<unknown>(null),

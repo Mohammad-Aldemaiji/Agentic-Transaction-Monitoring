@@ -12,6 +12,7 @@ vi.mock("../src/api", () => ({
         active: true,
         version: 1,
         is_self: true,
+        face_enrolled: true,
       },
       {
         id: "other",
@@ -21,6 +22,7 @@ vi.mock("../src/api", () => ({
         active: true,
         version: 1,
         is_self: false,
+        face_enrolled: true,
       },
     ],
   }),
@@ -29,10 +31,21 @@ it("disables all self-management controls while allowing management of another u
   render(<StaffUsers enabled />);
   const self = (await screen.findByText("admin@example.com")).closest("tr")!;
   expect(within(self).getByRole("combobox")).toBeDisabled();
-  for (const name of ["Disable", "Send password reset link", "Delete user"])
+  for (const name of [
+    "Disable",
+    "Send password reset link",
+    "Reset face sign-in",
+    "Delete user",
+  ])
     expect(within(self).getByRole("button", { name })).toBeDisabled();
   const other = screen.getByText("analyst@example.com").closest("tr")!;
   expect(within(other).getByRole("combobox")).toBeEnabled();
-  for (const name of ["Disable", "Send password reset link", "Delete user"])
+  for (const name of [
+    "Disable",
+    "Send password reset link",
+    "Reset face sign-in",
+    "Delete user",
+  ])
     expect(within(other).getByRole("button", { name })).toBeEnabled();
+  expect(within(other).getByText("Set up")).toBeInTheDocument();
 });

@@ -129,7 +129,12 @@ export default function App() {
   }
   if (loading || booth === null) return <Loading />;
   if (accountSetup)
-    return <AccountSetup onDone={() => setAccountSetup(false)} />;
+    return (
+      <AccountSetup
+        staffAccess={staffAccess}
+        onDone={() => setAccountSetup(false)}
+      />
+    );
   if (!identity)
     return (
       <Login
@@ -261,7 +266,11 @@ export default function App() {
                 setIdentity(null);
                 setCaseId("");
               }}
-              title="Sign in again for recent MFA"
+              title={
+                staffAccess
+                  ? "Sign in again with your password and face"
+                  : "Sign in again for recent MFA"
+              }
             >
               <Settings2 size={16} />
               Re-authenticate

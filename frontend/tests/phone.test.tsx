@@ -77,6 +77,10 @@ it("shows the returned AI explanation and full response", () => {
   } as unknown as Event;
   render(<AIResult finding={finding} />);
   expect(
+    screen.getByRole("heading", { name: "AI assessment" }),
+  ).toBeInTheDocument();
+  expect(screen.queryByText(/AI investigation/i)).not.toBeInTheDocument();
+  expect(
     screen.getByText("New beneficiary and unusual amount"),
   ).toBeInTheDocument();
   expect(

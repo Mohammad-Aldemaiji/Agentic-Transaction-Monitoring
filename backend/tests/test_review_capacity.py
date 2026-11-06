@@ -49,8 +49,18 @@ def test_capacity_policy_preserves_cases_records_bands_and_requires_new_version(
     assert capacity["opened_today"] == 2 and capacity["over_target"] is True
     assert capacity["suppresses_alerts"] is False
     assert response.json()["open_severity"] == {"CRITICAL": 2}
+    traffic = response.json()["transactions"]
+    assert traffic["received"] == traffic["received_today"] == traffic["received_last_hour"] == 2
+    assert traffic["scored"] == 2 and traffic["pending"] == 0 and traffic["failed"] == 0
+    assert traffic["flagged"] == traffic["flagged_last_hour"] == 2
+    assert traffic["flag_rate"] == 1.0
+    assert 0 <= traffic["average_risk_score"] <= 100
+    assert traffic["last_received_at"] and response.json()["generated_at"]
+    assert response.json()["decided_today"] == 0
     analyst = env["client"].get("/api/v1/dashboard", headers=env["headers"]())
     assert analyst.json()["review_capacity"] is None
+    # Outside the booth, analysts keep case-scoped numbers only (no team-wide traffic).
+    assert analyst.json()["transactions"] is None
     queue = env["client"].get("/api/v1/cases?severity=CRITICAL", headers=env["headers"]())
     assert len(queue.json()["items"]) == 2
     assert all(row["severity_policy"] == "risk-policy-v1" for row in queue.json()["items"])

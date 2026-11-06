@@ -37,3 +37,7 @@ npm --prefix frontend run format:check
 ```
 
 The 25 targeted UI tests use mocked responses; they do not prove real-user sign-in or replace the backend's Supabase integration tests. The separate `tests/preview.html` is a development-only visual fixture with writes and external fetches blocked. It is not included in the production build. Actual ML training/inference and real-bank actions are not performed by the frontend.
+
+## Face sign-in (staff workspace)
+
+In the staff workspace the second sign-in step is face verification, not an authenticator code. `src/face.ts` loads face-api.js and its models from `public/face/` (served from the same origin, so the page's `script-src 'self'` policy is unchanged) and `src/FaceScan.tsx` collects descriptors from several camera frames. Only descriptors are sent; the backend decides whether they match. See the repository README for enrollment, resets and limits.

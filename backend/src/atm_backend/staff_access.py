@@ -1,22 +1,26 @@
 """Individual staff access for the isolated local workspace.
 
-Supabase owns credentials and email delivery; local authoritative principals own roles.
-No role is read from user-editable provider metadata.
+Supabase owns passwords and email delivery; local authoritative principals own roles.
+No role is read from user-editable provider metadata. The second sign-in factor is
+server-checked face verification (see face_verification.py), which replaced the
+authenticator-app code.
 """
 
 import secrets
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 from uuid import UUID, uuid4
 
 import httpx
-from fastapi import FastAPI, Request, Response
-from pydantic import Field
-from sqlalchemy import DateTime, String, select, text, update
+from fastapi import Body, FastAPI, Request, Response
+from pydantic import Field, ValidationError
+from sqlalchemy import DateTime, String, delete, select, text, update
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 from atm_backend import contracts as dto
+from atm_backend import face_verification as face
 from atm_backend import services, sessions
 from atm_backend.db import database
 from atm_backend.main import DB, Identity
@@ -42,6 +46,18 @@ class StaffProfile(StaffBase):
     status: Mapped[str] = mapped_column(String(24), default="PENDING")
     version: Mapped[int] = mapped_column(default=1)
     attempted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class StaffFace(StaffBase):
+    """Enrolled face descriptors for one staff principal (biometric data; local only)."""
+
+    __tablename__ = "staff_faces"
+    __table_args__ = {"schema": "atm"}
+    principal_id: Mapped[UUID] = mapped_column(primary_key=True)
+    templates: Mapped[list[list[float]]] = mapped_column(JSONB)
+    enrolled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    failures: Mapped[int] = mapped_column(default=0)
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class InviteInput(dto.Input):
@@ -101,6 +117,37 @@ class InviteProvider:
         if not issuer.startswith("https://") or not issuer.endswith("/auth/v1"):
             raise ValueError("A verified Supabase Auth endpoint is required")
         self.url, self.key_file, self.origin = issuer, key_file, origin
+        self.transport: httpx.BaseTransport | None = None  # tests inject a mock transport
+
+    def remove_authenticators(self, user_id: UUID) -> int:
+        """Operator only: delete a user's old authenticator-app (TOTP) factors.
+
+        Face verification replaced the authenticator step. Supabase still asks for the
+        old code before a password change while such a factor exists, so remove it.
+        """
+        if not self.key_file or not self.key_file.is_file():
+            raise Problem(503, "invitations_not_configured")
+        key = self.key_file.read_text().strip()
+        if not key:
+            raise Problem(503, "invitations_not_configured")
+        headers = {"apikey": key, "Authorization": "Bearer " + key}
+        base = f"{self.url}/admin/users/{UUID(str(user_id))}/factors"
+        with httpx.Client(
+            timeout=15, follow_redirects=False, trust_env=False, transport=self.transport
+        ) as client:
+            response = client.get(base, headers=headers)
+            response.raise_for_status()
+            factors = response.json()
+            if not isinstance(factors, list):
+                raise ValueError("Unexpected factor list")
+            removed = 0
+            for factor in factors:
+                if isinstance(factor, dict) and factor.get("factor_type") == "totp":
+                    client.delete(
+                        f"{base}/{UUID(str(factor['id']))}", headers=headers
+                    ).raise_for_status()
+                    removed += 1
+            return removed
 
     def invite(self, email: str, name: str) -> str:
         if not self.key_file or not self.key_file.is_file():
@@ -156,8 +203,7 @@ class StaffVerifier(TokenVerifier):
         self.provider_engine, self.provider_factory = database(provider)
 
     def provider_active(self, claims: dict[str, Any]) -> None:
-        if claims.get("aal") != "aal2":
-            raise Problem(403, "mfa_required")
+        """The password sign-in's provider session must still be live (not signed out/revoked)."""
         try:
             subject, session_id = UUID(claims["sub"]), UUID(claims["session_id"])
         except (KeyError, ValueError, TypeError):
@@ -173,11 +219,7 @@ class StaffVerifier(TokenVerifier):
             ):
                 raise Problem(401, "provider_session_revoked")
 
-    def from_claims(self, session: Session, claims: dict[str, Any], request_id: str) -> Actor:
-        # Legacy presenter/synthetic sessions cannot cross this boundary.
-        if claims.get("staff_session") is not True or claims.get("exp", 0) <= now().timestamp():
-            raise Problem(401, "authentication_required")
-        self.provider_active(claims)
+    def principal(self, session: Session, claims: dict[str, Any]) -> Principal:
         principal = session.scalar(
             select(Principal).where(
                 Principal.issuer == self.provider.settings.issuer,
@@ -192,6 +234,17 @@ class StaffVerifier(TokenVerifier):
             or principal.role not in ("admin", "analyst", "supervisor")
         ):
             raise Problem(401, "identity_inactive")
+        return principal
+
+    def from_claims(self, session: Session, claims: dict[str, Any], request_id: str) -> Actor:
+        # Legacy presenter/synthetic sessions cannot cross this boundary.
+        if claims.get("staff_session") is not True or claims.get("exp", 0) <= now().timestamp():
+            raise Problem(401, "authentication_required")
+        # Set only by the server after a successful face match; never taken from the browser.
+        if claims.get("second_factor") != "face":
+            raise Problem(403, "mfa_required")
+        self.provider_active(claims)
+        principal = self.principal(session, claims)
         return Actor(
             principal.id,
             principal.team,
@@ -209,8 +262,8 @@ def install(app: FastAPI, provider: Settings, key_file: Path | None = None) -> N
     app.state.staff_access = True
     app.state.invites = InviteProvider(provider.issuer, key_file, app.state.settings.browser_origin)
 
-    @app.post("/api/v1/staff/session")
-    def login(request: Request, response: Response, s: DB) -> dict[str, Any]:
+    def password_claims(request: Request) -> dict[str, Any]:
+        """Step one: a same-origin request carrying the provider's password sign-in token."""
         if request.headers.get("origin") != app.state.settings.browser_origin:
             raise Problem(403, "origin_denied")
         authorization = request.headers.get("authorization", "")
@@ -222,7 +275,79 @@ def install(app: FastAPI, provider: Settings, key_file: Path | None = None) -> N
             for k in ("iss", "sub", "iat", "auth_time", "aal", "session_id")
             if k in claims
         }
-        safe.update(staff_session=True, exp=int(now().timestamp()) + 86400)
+        verifier.provider_active(safe)
+        return safe
+
+    def check_face(principal: Principal, body: face.FaceInput, request_id: str) -> float | None:
+        """Step two: enroll or match the face in its own transaction, so failures are counted.
+
+        Returns the average match distance, or None when the face was enrolled just now.
+        """
+        actor = Actor(principal.id, principal.team, principal.role, now(), request_id)
+        with app.state.factory.begin() as tx:
+            row = tx.scalar(
+                select(StaffFace).where(StaffFace.principal_id == principal.id).with_for_update()
+            )
+            if row is None:
+                if not body.enroll:
+                    raise Problem(403, "face_enrollment_required")
+                if (
+                    len(body.samples) < face.ENROLL_SAMPLES
+                    or not face.distinct(body.samples)
+                    or not face.consistent(body.samples)
+                ):
+                    raise Problem(422, "face_samples_invalid")
+                tx.add(StaffFace(principal_id=principal.id, templates=body.samples))
+                services.audit(tx, actor, "staff.face_enrolled", principal.id)
+                return None
+            if body.enroll:
+                raise Problem(409, "face_already_enrolled")
+            if row.locked_until and row.locked_until > now():
+                raise Problem(429, "face_verification_locked")
+            if not face.distinct(body.samples):
+                raise Problem(422, "face_samples_invalid")
+            result = face.match(row.templates, body.samples)
+            if result is None:
+                row.failures += 1
+                if row.failures >= face.MAX_FAILURES:
+                    row.failures = 0
+                    row.locked_until = now() + timedelta(seconds=face.LOCK_SECONDS)
+                    services.audit(tx, actor, "staff.face_locked", principal.id)
+                services.audit(tx, actor, "staff.face_rejected", principal.id)
+            else:
+                row.failures, row.locked_until = 0, None
+        # Raised after the commit so the failed attempt stays counted.
+        if result is None:
+            raise Problem(401, "face_not_recognized")
+        return result
+
+    @app.post("/api/v1/staff/face/status")
+    def face_status(request: Request, s: DB) -> dict[str, bool]:
+        claims = password_claims(request)
+        principal = verifier.principal(s, claims)
+        return {"enrolled": s.get(StaffFace, principal.id) is not None}
+
+    @app.post("/api/v1/staff/session")
+    def login(
+        request: Request,
+        response: Response,
+        s: DB,
+        payload: Annotated[dict[str, Any] | None, Body()] = None,
+    ) -> dict[str, Any]:
+        safe = password_claims(request)
+        principal = verifier.principal(s, safe)
+        # Validate the face samples only after the password token is accepted.
+        try:
+            body = face.FaceInput.model_validate(payload)
+        except ValidationError:
+            raise Problem(422, "face_samples_invalid") from None
+        distance = check_face(principal, body, request.state.request_id)
+        safe.update(
+            staff_session=True,
+            exp=int(now().timestamp()) + 86400,
+            second_factor="face",
+            face_verified_at=int(now().timestamp()),
+        )
         actor = verifier.from_claims(s, safe, request.state.request_id)
         previous = s.get(
             BrowserSession, sessions.digest(request.cookies.get(sessions.cookie_name(request), ""))
@@ -251,14 +376,21 @@ def install(app: FastAPI, provider: Settings, key_file: Path | None = None) -> N
             max_age=86400,
         )
         services.audit(s, actor, "staff.signed_in", actor.id)
-        return {"csrf_token": csrf}
+        return {
+            "csrf_token": csrf,
+            "face": {
+                "enrolled_now": distance is None,
+                "distance": None if distance is None else round(distance, 3),
+            },
+        }
 
     @app.get("/api/v1/staff/users")
     def users(s: DB, a: Identity) -> dict[str, Any]:
         a.require("admin")
         rows = s.execute(
-            select(StaffProfile, Principal.active)
+            select(StaffProfile, Principal.active, StaffFace.principal_id)
             .outerjoin(Principal, Principal.id == StaffProfile.principal_id)
+            .outerjoin(StaffFace, StaffFace.principal_id == StaffProfile.principal_id)
             .where(StaffProfile.status != "DELETED")
             .order_by(StaffProfile.email)
         ).all()
@@ -273,8 +405,9 @@ def install(app: FastAPI, provider: Settings, key_file: Path | None = None) -> N
                     "active": active,
                     "version": r.version,
                     "is_self": r.principal_id == a.id,
+                    "face_enrolled": enrolled is not None,
                 }
-                for r, active in rows
+                for r, active, enrolled in rows
             ]
         }
 
@@ -458,5 +591,35 @@ def install(app: FastAPI, provider: Settings, key_file: Path | None = None) -> N
                 .where(BrowserSession.principal_id == principal.id)
                 .values(revoked=True)
             )
+            # Biometric data is not retained for deleted users; a restored user enrolls again.
+            s.execute(delete(StaffFace).where(StaffFace.principal_id == principal.id))
         row.status, row.version = "DELETED", row.version + 1
         services.audit(s, a, "staff.deleted", row.principal_id or row.id)
+
+    @app.delete("/api/v1/staff/users/{user_id}/face", status_code=204)
+    def reset_face(user_id: UUID, s: DB, a: Identity) -> None:
+        """Remove a user's face enrollment; they enroll again at their next sign-in."""
+        a.require("admin")
+        if (now() - a.auth_time).total_seconds() > STAFF_ACTION_AUTH_SECONDS:
+            raise Problem(403, "fresh_authentication_required")
+        row = s.scalar(select(StaffProfile).where(StaffProfile.id == user_id).with_for_update())
+        if not row or row.status == "DELETED" or not row.principal_id:
+            raise Problem(404, "not_found")
+        # Resetting your own face would let a password alone enroll a new one.
+        if row.principal_id == a.id:
+            raise Problem(409, "cannot_change_own_access")
+        principal = s.get(Principal, row.principal_id)
+        if not principal or principal.team != a.team:
+            raise Problem(404, "not_found")
+        enrolled = s.scalar(
+            select(StaffFace).where(StaffFace.principal_id == principal.id).with_for_update()
+        )
+        if enrolled is None:
+            raise Problem(409, "face_not_enrolled")
+        s.delete(enrolled)
+        s.execute(
+            update(BrowserSession)
+            .where(BrowserSession.principal_id == principal.id)
+            .values(revoked=True)
+        )
+        services.audit(s, a, "staff.face_reset", principal.id)

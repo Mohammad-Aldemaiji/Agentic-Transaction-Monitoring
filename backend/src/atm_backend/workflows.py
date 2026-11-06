@@ -87,7 +87,10 @@ def register(app: FastAPI) -> None:
 
     @app.get("/api/v1/dashboard")
     def dashboard(s: DB, a: Identity) -> dict[str, Any]:
-        return queries.dashboard(s, a)
+        # Team-wide traffic follows the existing workload rule (team-wide reviewers only),
+        # except in the isolated booth, where reviewers already see the whole bank feed.
+        include = a.role in ("supervisor", "auditor") or app.state.settings.environment == "booth"
+        return queries.dashboard(s, a, include_traffic=include)
 
     @app.get("/api/v1/transactions")
     def transactions(

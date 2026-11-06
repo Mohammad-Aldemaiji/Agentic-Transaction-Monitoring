@@ -5,7 +5,7 @@ An integrated senior-project workspace for synthetic bank transactions, supervis
 CS/IS/SE 499, Prince Sultan University, Semester 261. Supervisor: Dr. Tariq.
 Originated by Mohammad Aldemaiji; this version integrates his E05 model and local-agent approach with the team's monitored review workflow. See [attribution](ATTRIBUTION.md).
 
-**Review version: 5 November 2026.** This is a local research/presentation application, not a production banking deployment. No money is withdrawn, no real account is frozen, and no actual customer is called. Runtime credentials, local databases and downloaded AI/voice assets are not included.
+**Review version: 6 November 2026.** This is a local research/presentation application, not a production banking deployment. No money is withdrawn, no real account is frozen, and no actual customer is called. Runtime credentials, local databases and downloaded AI/voice assets are not included.
 
 ## What this version adds
 
@@ -17,8 +17,10 @@ Originated by Mohammad Aldemaiji; this version integrates his E05 model and loca
 - Phone-style simulated verification: ringing, accept, confirm/deny keypad, unavailable/timeout outcomes and optional local speech.
 - Human proposals, independent supervisor approvals, simulated execution receipts and final case decisions.
 - Model/policy governance, reviewed-data exports and processing/recovery screens.
-- Supabase email/password sign-in and authenticator verification, with server-assigned staff roles. Local sessions last up to 24 hours, including idle time. Staff-management actions require verification within five hours.
-- Admin-only invitations, password reset emails, role changes, disable/enable, deletion and restoration. Access changes revoke sessions. Your own account controls are disabled and rejected by the server.
+- Two-step staff sign-in: Supabase email/password, then face verification (replaces the authenticator app). Server-assigned staff roles. Local sessions last up to 24 hours, including idle time. Staff-management actions require verification within five hours.
+- Live dashboard numbers: the review queue's case and transaction cards update every 5 seconds without reloading the case list.
+- AI advice in a case is shown under **AI assessment**.
+- Admin-only invitations, password reset emails, face sign-in resets, role changes, disable/enable, deletion and restoration. Access changes revoke sessions. Your own account controls are disabled and rejected by the server.
 
 ## Roles
 
@@ -88,7 +90,27 @@ npm --prefix frontend run build
 backend/.venv/bin/python backend/scripts/booth_demo.py serve
 ```
 
-Open **https://localhost:8555/** and sign in with your assigned staff account and its authenticator code. The launcher starts its worker and initializes the synthetic identities, model and policy. PostgreSQL uses a dedicated `atm-booth-db` container and persistent `atm-booth-data` volume on loopback port 55439. Restarting retains records. Ctrl-C stops the application; do not delete the volume merely to stop it. The [older presentation walkthrough](docs/BOOTH_DEMO.md) documents the previous role-switching version. Use this README for current account setup.
+Open **https://localhost:8555/** and sign in with your assigned staff account's password, then look at the camera (see [Face sign-in](#face-sign-in)). The launcher starts its worker and initializes the synthetic identities, model and policy. PostgreSQL uses a dedicated `atm-booth-db` container and persistent `atm-booth-data` volume on loopback port 55439. Restarting retains records. Ctrl-C stops the application; do not delete the volume merely to stop it. The [older presentation walkthrough](docs/BOOTH_DEMO.md) documents the previous role-switching version. Use this README for current account setup.
+
+### Face sign-in
+
+The second sign-in step is face verification. It replaced the authenticator-app code in the staff workspace (port 8555).
+
+1. Sign in with email and password (Supabase).
+2. **First sign-in:** agree to the notice, then hold still while the camera captures five frames. This enrolls your face.
+3. **Later sign-ins:** look at the camera; three frames must each match your enrolled face.
+
+How it works: the browser runs [face-api.js](https://github.com/justadudewhohacks/face-api.js) (bundled in `frontend/public/face/`, no CDN) and sends only 128-number face descriptors, never images. The **server** stores the enrolled descriptors in the local `atm_booth.staff_faces` table and makes every match decision (`backend/src/atm_backend/face_verification.py`, distance threshold 0.5). A session is created only after a server-side match, so a browser cannot skip the step. Five failed scans in a row lock face sign-in for 15 minutes. Every enrollment, rejection and reset is audited.
+
+Administrators can use **Reset face sign-in** on the Users page (for example, after a camera change). The user is signed out and enrolls again at their next sign-in. Administrators cannot reset their own face. Deleting a user also deletes their face data.
+
+Accounts that enrolled an authenticator app before this change still have that factor in Supabase, and Supabase asks for its code before a password change. Remove those old factors once (uses `.runtime/supabase-invite-key`):
+
+```sh
+backend/.venv/bin/python backend/scripts/booth_demo.py remove-authenticators
+```
+
+Limits: this is a prototype factor. There is no liveness detection, so a good photo or video of the enrolled person can pass. Use it only with people who agree to it and never to protect real accounts. Camera access requires the HTTPS address above. The older launch profiles (8443, 8444) still use their authenticator-based sign-in.
 
 For optional local AI, in another terminal:
 
@@ -117,6 +139,8 @@ Staff-account verification on 5 November: six staff/presenter backend tests pass
 Deleting a user retains an inactive audit record and the Supabase identity. Adding the same email restores the selected role and requests a fresh password setup email. Existing enabled users have a Send password reset link button. Email requests have a minimum 60-second retry interval and remain subject to provider limits. If delivery fails after restoration, the account is already restored; refresh the list and use the reset button after checking Auth logs.
 
 The staff directory and transaction history remain in the local Docker database. A Git clone does not transfer those records, SMTP settings, keys, or model downloads. Public/Windows hosting is pending preparation.
+
+Face sign-in and live dashboard verification on 6 November: 199 backend tests passed (1 optional load test skipped) against a local PostgreSQL copy of the reviewed migrations, and all 52 frontend tests passed. An end-to-end browser run against the real backend and built dashboard, with a fake webcam showing computer-generated faces, enrolled two accounts, verified a returning user (distance 0.058), rejected a different face, and showed the transaction cards updating live. Supabase itself was simulated in that run, so a real-account sign-in on the team's Supabase project is still needed.
 
 Known issues for review:
 - `verify_booth.py` accepts authenticated session inputs but retains an incompatible initial unauthenticated `/me` assertion. Its older successful run predates presenter authentication; the current script needs updating.

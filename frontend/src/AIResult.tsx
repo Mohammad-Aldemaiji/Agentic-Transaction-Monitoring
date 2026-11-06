@@ -16,7 +16,7 @@ export default function AIResult({
         )
       : [];
   return (
-    <Panel title="AI investigation result">
+    <Panel title="AI assessment">
       <div className="panel-body ai-result" role="status">
         {currentVersion !== undefined &&
           details.evidence_version !== currentVersion && (

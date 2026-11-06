@@ -17,7 +17,13 @@ const setupRequested = query.get("account") === "setup" || callback !== null;
 if (callback || setupRequested)
   window.history.replaceState(null, "", window.location.pathname);
 export const hasAccountSetup = () => setupRequested;
-export default function AccountSetup({ onDone }: { onDone: () => void }) {
+export default function AccountSetup({
+  onDone,
+  staffAccess = false,
+}: {
+  onDone: () => void;
+  staffAccess?: boolean;
+}) {
   const [ready, setReady] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState<unknown>(null);
@@ -92,8 +98,9 @@ export default function AccountSetup({ onDone }: { onDone: () => void }) {
       <Brand />
       <h1>Set your password</h1>
       <p>
-        Choose your own password, then sign in and complete authenticator
-        verification.
+        {staffAccess
+          ? "Choose your own password, then sign in and verify with your face."
+          : "Choose your own password, then sign in and complete authenticator verification."}
       </p>
       <ErrorBox error={error} />
       {!ready ? (
@@ -123,6 +130,14 @@ export default function AccountSetup({ onDone }: { onDone: () => void }) {
                 onChange={(e) => setConfirmation(e.target.value)}
               />
             </Field>
+            {factor && staffAccess && (
+              <p className="muted">
+                This account still has an authenticator app registered from
+                before face sign-in, so Supabase asks for its code to change the
+                password. The operator can remove old authenticators with the
+                remove-authenticators command.
+              </p>
+            )}
             {factor && (
               <Field label="Authenticator code">
                 <input

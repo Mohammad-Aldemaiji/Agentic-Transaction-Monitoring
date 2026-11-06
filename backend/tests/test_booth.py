@@ -18,7 +18,10 @@ def test_booth_routes_are_absent_outside_isolated_profile(signing_keys):
     with pytest.raises(ValueError):
         register(app)
     with TestClient(app) as client:
-        assert client.get("/api/v1/booth/config").json() == {"enabled": False}
+        assert client.get("/api/v1/booth/config").json() == {
+            "enabled": False,
+            "staff_access": False,
+        }
         assert client.post("/api/v1/booth/role", json={"role": "admin"}).status_code == 404
         assert client.post("/api/v1/booth/feed", json={"count": 100}).status_code == 404
 

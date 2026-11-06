@@ -77,11 +77,28 @@ export interface Summary {
   pending_proposals: number;
   unfinished_approved_actions: number;
 }
+export interface TrafficStats {
+  received: number;
+  received_today: number;
+  received_last_hour: number;
+  scored: number;
+  pending: number;
+  failed: number;
+  flagged: number;
+  flagged_last_hour: number;
+  flag_rate: number | null;
+  average_risk_score: number | null;
+  last_received_at: string | null;
+}
 export interface Dashboard {
   cases: Record<string, number>;
   open_severity: Record<string, number>;
   decisions: Record<string, number>;
   oldest_open_at: string | null;
+  /** Team-wide transaction counters; null when the role sees case-scoped numbers only. */
+  transactions?: TrafficStats | null;
+  decided_today?: number;
+  generated_at?: string;
   review_capacity: {
     target: number | null;
     completed_today: number;

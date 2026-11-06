@@ -11,6 +11,7 @@ type User = {
   active: boolean | null;
   version: number;
   is_self: boolean;
+  face_enrolled: boolean;
 };
 export default function StaffUsers({ enabled }: { enabled: boolean }) {
   const [users, setUsers] = useState<User[]>([]);
@@ -41,7 +42,7 @@ export default function StaffUsers({ enabled }: { enabled: boolean }) {
       setMessage(
         result.status === "RESTORED_RESET_SENT"
           ? "User restored with the selected role. A fresh password setup link has been requested by email."
-          : "Invitation sent. The user chooses their password and enrolls an authenticator.",
+          : "Invitation sent. The user chooses their password and sets up face sign-in at their first sign-in.",
       );
       setEmail("");
       setName("");
@@ -79,6 +80,29 @@ export default function StaffUsers({ enabled }: { enabled: boolean }) {
       await api(`/staff/users/${user.id}/reset-password`, { method: "POST" });
       setMessage(
         "Password reset email requested. Ask the user to open the newest email.",
+      );
+    } catch (e) {
+      setError(e);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function resetFace(user: User) {
+    if (
+      busy ||
+      !window.confirm(
+        `Reset face sign-in for ${user.name}? Their saved face data is deleted, they are signed out, and they set up face sign-in again at their next sign-in.`,
+      )
+    )
+      return;
+    setBusy(true);
+    setError(null);
+    setMessage("");
+    try {
+      await api(`/staff/users/${user.id}/face`, { method: "DELETE" });
+      await refresh();
+      setMessage(
+        "Face sign-in reset. The user sets it up again at their next sign-in.",
       );
     } catch (e) {
       setError(e);
@@ -192,6 +216,7 @@ export default function StaffUsers({ enabled }: { enabled: boolean }) {
             <th>Email</th>
             <th>Role</th>
             <th>Access</th>
+            <th>Face sign-in</th>
             <th>Action</th>
           </tr>
         </thead>
@@ -228,6 +253,7 @@ export default function StaffUsers({ enabled }: { enabled: boolean }) {
                     ? "Enabled"
                     : "Disabled"}
               </td>
+              <td>{user.face_enrolled ? "Set up" : "Not set up"}</td>
               <td>
                 {user.active === null && (
                   <button
@@ -251,6 +277,14 @@ export default function StaffUsers({ enabled }: { enabled: boolean }) {
                     onClick={() => resetPassword(user)}
                   >
                     Send password reset link
+                  </button>
+                )}
+                {user.face_enrolled && (
+                  <button
+                    disabled={busy || user.is_self}
+                    onClick={() => resetFace(user)}
+                  >
+                    Reset face sign-in
                   </button>
                 )}
                 <button

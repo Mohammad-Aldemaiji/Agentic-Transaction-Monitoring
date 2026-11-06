@@ -29,7 +29,7 @@ export function errorText(status: number, code: string) {
     local_transcription_unavailable:
       "This recording could not be transcribed. You can type your reply instead.",
     fresh_authentication_required:
-      "Please sign in again with your authenticator, then retry this action.",
+      "Please sign in again (Re-authenticate), then retry this action.",
     independent_approval_required:
       "A different supervisor must approve this request.",
     identity_inactive:
@@ -37,7 +37,18 @@ export function errorText(status: number, code: string) {
     authentication_provider_unavailable:
       "Sign-in verification is temporarily unavailable. Please try again shortly.",
     mfa_required:
-      "Complete authenticator verification to access this workspace.",
+      "Complete the second verification step to access this workspace.",
+    face_not_recognized:
+      "Your face did not match this account. Face the camera in good light and scan again.",
+    face_verification_locked:
+      "Too many face scans did not match. Wait 15 minutes, or ask an administrator to reset your face sign-in.",
+    face_enrollment_required:
+      "Face sign-in is not set up for this account yet. Set it up to continue.",
+    face_already_enrolled:
+      "Face sign-in is already set up for this account. Scan to verify instead.",
+    face_samples_invalid:
+      "The scan was not clear enough. Keep only your face in the frame, hold still and scan again.",
+    face_not_enrolled: "This user has not set up face sign-in yet.",
     evidence_changed:
       "The case evidence changed. Refresh and review it before creating a new proposal.",
     csrf_failed:

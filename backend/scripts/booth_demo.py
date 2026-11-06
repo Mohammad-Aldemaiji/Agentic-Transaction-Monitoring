@@ -302,7 +302,9 @@ def bootstrap(api, cfg):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=["serve", "prepare", "first-admin"])
+    parser.add_argument(
+        "action", choices=["serve", "prepare", "first-admin", "remove-authenticators"]
+    )
     parser.add_argument("--subject", type=UUID)
     parser.add_argument("--email")
     args = parser.parse_args()
@@ -322,6 +324,25 @@ def main():
         with api.state.factory.begin() as session:
             provision_first_admin(session, provider.issuer, args.subject, args.email)
         print("First administrator verified in the local staff workspace.")
+        return
+    if args.action == "remove-authenticators":
+        # Face verification replaced the authenticator app. Remove the old TOTP factors
+        # so Supabase stops asking for their codes (for example on password reset).
+        from atm_backend.staff_access import InviteProvider, StaffProfile
+
+        provider = Settings(_env_file=ROOT / ".runtime/supabase-app.env")
+        invites = InviteProvider(provider.issuer, ROOT / ".runtime/supabase-invite-key", ORIGIN)
+        with api.state.factory.begin() as session:
+            staff = session.execute(
+                select(StaffProfile.email, Principal.subject)
+                .join(Principal, Principal.id == StaffProfile.principal_id)
+                .where(StaffProfile.status != "DELETED", Principal.issuer == provider.issuer)
+                .order_by(StaffProfile.email)
+            ).all()
+        for email, subject in staff:
+            removed = invites.remove_authenticators(UUID(subject))
+            print(f"{email}: removed {removed} authenticator factor(s)")
+        print(f"Checked {len(staff)} staff account(s).")
         return
     api.state.booth_bootstrap = True
     try:

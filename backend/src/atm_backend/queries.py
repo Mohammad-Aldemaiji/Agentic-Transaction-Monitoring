@@ -1,6 +1,6 @@
 """Scoped queue and dashboard read models with bounded, deterministic pagination."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Literal
 from uuid import UUID
 
@@ -149,7 +149,44 @@ def case_queue(
     }
 
 
-def dashboard(s: Session, a: Actor) -> dict[str, Any]:
+def traffic(s: Session, team: str) -> dict[str, Any]:
+    """Team-wide transaction counters for the live dashboard cards."""
+    current = now()
+    day = current.replace(hour=0, minute=0, second=0, microsecond=0)
+    hour = current - timedelta(hours=1)
+    score = cast(Transaction.result["risk_score"].as_string(), Float)
+    row = (
+        s.execute(
+            select(
+                func.count().label("received"),
+                func.count().filter(Transaction.received_at >= day).label("received_today"),
+                func.count().filter(Transaction.received_at >= hour).label("received_last_hour"),
+                func.count().filter(Transaction.status == "SCORED").label("scored"),
+                func.count().filter(Transaction.status == "PENDING").label("pending"),
+                func.count().filter(Transaction.status == "FAILED").label("failed"),
+                func.count(Case.id).label("flagged"),
+                func.count(Case.id).filter(Case.created_at >= hour).label("flagged_last_hour"),
+                func.avg(score).filter(Transaction.status == "SCORED").label("average_score"),
+                func.max(Transaction.received_at).label("last_received_at"),
+            )
+            .select_from(Transaction)
+            .outerjoin(Case, Case.transaction_id == Transaction.id)
+            .where(Transaction.team == team)
+        )
+        .mappings()
+        .one()
+    )
+    received, average = row["received"] or 0, row["average_score"]
+    return {
+        **{key: row[key] or 0 for key in row if key not in ("average_score", "last_received_at")},
+        "flag_rate": round(row["flagged"] / received, 4) if received else None,
+        # Display scale (model output x 100), the same uncalibrated score shown elsewhere.
+        "average_risk_score": round(float(average) * 100, 2) if average is not None else None,
+        "last_received_at": row["last_received_at"],
+    }
+
+
+def dashboard(s: Session, a: Actor, include_traffic: bool = False) -> dict[str, Any]:
     ids = visible_cases(a).with_only_columns(Case.id)
     counts = dict(
         s.execute(select(Case.state, func.count()).where(Case.id.in_(ids)).group_by(Case.state))
@@ -216,8 +253,19 @@ def dashboard(s: Session, a: Actor) -> dict[str, Any]:
             "policy_version": policy.version if policy else None,
             "suppresses_alerts": False,
         }
+    decided_today = (
+        s.scalar(
+            select(func.count())
+            .select_from(Decision)
+            .where(Decision.case_id.in_(ids), Decision.created_at >= day)
+        )
+        or 0
+    )
     return {
         "review_capacity": capacity,
+        "transactions": traffic(s, a.team) if include_traffic else None,
+        "decided_today": decided_today,
+        "generated_at": now(),
         "cases": counts,
         "open_severity": bands,
         "decisions": decisions,
