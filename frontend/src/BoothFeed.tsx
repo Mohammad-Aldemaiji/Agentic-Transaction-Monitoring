@@ -69,7 +69,7 @@ export default function BoothFeed({
         </p>
         {stats && (
           <p>
-            Low: {stats.low} · Medium: {stats.medium} · High: {stats.high} ·
+            Low: {stats.low}, Medium: {stats.medium}, High: {stats.high},
             Critical: {stats.critical}
           </p>
         )}
@@ -93,7 +93,7 @@ export default function BoothFeed({
               }, "Bank payments received for scoring.")
             }
           >
-            Simulate incoming traffic · 100 payments
+            Simulate 100 incoming payments
           </button>
         )}
         <div className="button-row" style={{ marginTop: 20 }}>
@@ -110,7 +110,7 @@ export default function BoothFeed({
               <option value="">All customers</option>
               {customers.data?.items.map((c) => (
                 <option key={c.account_id} value={c.account_id}>
-                  {c.name} · {c.account_id} · {c.received} received /{" "}
+                  {c.name}, {c.account_id}, {c.received} received /{" "}
                   {c.available} available
                 </option>
               ))}
@@ -207,7 +207,7 @@ export default function BoothFeed({
         </div>
         {selected && (
           <section>
-            <h3>Bank transaction · {selected.external_id}</h3>
+            <h3>Bank transaction {selected.external_id}</h3>
             <ErrorBox error={source.error} />
             <pre className="json-payload">
               {JSON.stringify(source.data ?? selected, null, 2)}

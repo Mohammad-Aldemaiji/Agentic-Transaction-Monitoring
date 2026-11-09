@@ -126,8 +126,7 @@ export default function Models({ identity }: { identity: Identity }) {
                         : "External model artifact"}
                     </p>
                     <p>
-                      Precision {m.metrics.precision} · Recall{" "}
-                      {m.metrics.recall}
+                      Precision {m.metrics.precision}, recall {m.metrics.recall}
                     </p>
                     <small className="break">SHA-256: {m.digest}</small>
                     {identity.role === "supervisor" &&
@@ -301,7 +300,7 @@ export default function Models({ identity }: { identity: Identity }) {
                   <article key={d.id} className="note">
                     <strong>Model {short(d.model_id)}</strong>
                     <p>
-                      Statistic: {d.statistic} · Samples: {d.sample_size}
+                      Statistic: {d.statistic}, samples: {d.sample_size}
                     </p>
                     <small>{date(d.window_end)}</small>
                   </article>
@@ -421,7 +420,7 @@ function TrainingCard({
       </div>
       <ErrorBox error={status.error} />
       <p>
-        {status.data?.sample_size ?? "—"} reviewed examples ·{" "}
+        {status.data?.sample_size ?? "—"} reviewed examples,{" "}
         {date(t.created_at)}
       </p>
       <small className="break">Snapshot hash: {t.snapshot_hash}</small>

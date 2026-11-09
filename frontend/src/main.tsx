@@ -1,7 +1,11 @@
 import { Component, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
+import { applyTheme, initialTheme } from "./ui";
+import "./fonts";
 import "./style.css";
+// Set the saved (or system) theme before the first paint to avoid a flash.
+applyTheme(initialTheme());
 // Email confirmation may return provider tokens in the URL. Sign in explicitly;
 // never retain those tokens in browser history or persistent application storage.
 if (/(?:access_token|refresh_token)=/.test(window.location.hash)) {

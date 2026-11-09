@@ -89,6 +89,16 @@ export interface TrafficStats {
   flag_rate: number | null;
   average_risk_score: number | null;
   last_received_at: string | null;
+  /** Payments scored today (UTC), counted in ten 10-point score bands. */
+  score_bins_today?: number[];
+}
+export interface Trends {
+  /** 14 UTC dates (YYYY-MM-DD), oldest first. */
+  days: string[];
+  flagged_by_day: Record<string, number>[];
+  /** The last 7 days. */
+  decided_by_day: number[];
+  decision_hours_by_day: (number | null)[];
 }
 export interface Dashboard {
   cases: Record<string, number>;
@@ -99,6 +109,9 @@ export interface Dashboard {
   transactions?: TrafficStats | null;
   decided_today?: number;
   generated_at?: string;
+  trends?: Trends;
+  /** Active policy review threshold on the 0-100 display scale. */
+  review_threshold?: number | null;
   review_capacity: {
     target: number | null;
     completed_today: number;

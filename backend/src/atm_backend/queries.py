@@ -1,6 +1,6 @@
 """Scoped queue and dashboard read models with bounded, deterministic pagination."""
 
-from datetime import datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any, Literal
 from uuid import UUID
 
@@ -177,12 +177,75 @@ def traffic(s: Session, team: str) -> dict[str, Any]:
         .one()
     )
     received, average = row["received"] or 0, row["average_score"]
+    # Ten-point score bands (display scale 0-100) for payments scored today (UTC).
+    score_bins = [0] * 10
+    for value in s.scalars(
+        select(score).where(
+            Transaction.team == team,
+            Transaction.status == "SCORED",
+            Transaction.received_at >= day,
+            score.is_not(None),
+        )
+    ):
+        score_bins[min(9, max(0, int(float(value) * 10)))] += 1
     return {
+        "score_bins_today": score_bins,
         **{key: row[key] or 0 for key in row if key not in ("average_score", "last_received_at")},
         "flag_rate": round(row["flagged"] / received, 4) if received else None,
         # Display scale (model output x 100), the same uncalibrated score shown elsewhere.
         "average_risk_score": round(float(average) * 100, 2) if average is not None else None,
         "last_received_at": row["last_received_at"],
+    }
+
+
+TREND_DAYS = 14
+DECISION_DAYS = 7
+BANDS = ("CRITICAL", "HIGH", "MEDIUM", "LOW", "UNSCORED")
+
+
+def utc_day(value: datetime) -> date:
+    return (value.astimezone(UTC) if value.tzinfo else value).date()
+
+
+def trends(s: Session, ids: Any, day: datetime) -> dict[str, Any]:
+    """Daily chart series for the overview, limited to the actor's visible cases."""
+    start = day - timedelta(days=TREND_DAYS - 1)
+    days = [(start + timedelta(days=i)).date() for i in range(TREND_DAYS)]
+    flagged = {d: dict.fromkeys(BANDS, 0) for d in days}
+    rows = s.execute(
+        select(Case.created_at, severity_expression())
+        .select_from(Case)
+        .join(Transaction, Transaction.id == Case.transaction_id)
+        .where(Case.id.in_(ids), Case.created_at >= start)
+    ).all()
+    for created, band in rows:
+        bucket = flagged.get(utc_day(created))
+        if bucket is not None and band in bucket:
+            bucket[band] += 1
+    recent = days[-DECISION_DAYS:]
+    decided = dict.fromkeys(recent, 0)
+    hours: dict[date, list[float]] = {d: [] for d in recent}
+    for decided_at, opened in s.execute(
+        select(Decision.created_at, Case.created_at)
+        .select_from(Decision)
+        .join(Case, Case.id == Decision.case_id)
+        .where(
+            Decision.case_id.in_(ids),
+            Decision.created_at >= day - timedelta(days=DECISION_DAYS - 1),
+        )
+    ).all():
+        key = utc_day(decided_at)
+        if key in decided:
+            decided[key] += 1
+            hours[key].append(max(0.0, (decided_at - opened).total_seconds() / 3600))
+    return {
+        "days": [d.isoformat() for d in days],
+        "flagged_by_day": [flagged[d] for d in days],
+        "decided_by_day": [decided[d] for d in recent],
+        # Mean hours from case opened to final decision, per day; null when nothing was decided.
+        "decision_hours_by_day": [
+            round(sum(hours[d]) / len(hours[d]), 2) if hours[d] else None for d in recent
+        ],
     }
 
 
@@ -264,6 +327,8 @@ def dashboard(s: Session, a: Actor, include_traffic: bool = False) -> dict[str, 
     return {
         "review_capacity": capacity,
         "transactions": traffic(s, a.team) if include_traffic else None,
+        "trends": trends(s, ids, day),
+        "review_threshold": round(policy.threshold * 100, 2) if policy else None,
         "decided_today": decided_today,
         "generated_at": now(),
         "cases": counts,

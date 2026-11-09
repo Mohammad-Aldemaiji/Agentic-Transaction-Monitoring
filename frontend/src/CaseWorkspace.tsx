@@ -10,12 +10,12 @@ import {
   Loading,
   Panel,
   Refresh,
-  Title,
   useAction,
   useResource,
 } from "./ui";
 import CallPanel from "./CallPanel";
 import AIResult from "./AIResult";
+import { SEVERITY_COLOR } from "./Charts";
 import type {
   Call,
   Event,
@@ -98,7 +98,7 @@ function ProposalCard({
       <p>{p.reason}</p>
       <Details value={p.target} />
       <small className="muted">
-        Evidence version {p.evidence_version} · Expires {date(p.expires_at)}
+        Evidence version {p.evidence_version}, expires {date(p.expires_at)}
       </small>
       <ErrorBox error={execution.error} />
       {execution.data && (
@@ -258,48 +258,65 @@ export default function CaseWorkspace({
     <>
       <button className="text-button back" onClick={onBack}>
         <ArrowLeft size={16} />
-        Back to review queue
+        Back to overview
       </button>
-      <Title
-        eyebrow={"CASE WORKSPACE / " + short(id)}
-        title={c.account_id}
-        actions={
-          <>
-            <Badge value={c.state} />
+      <section className="case-hero" aria-label={"Case " + short(id)}>
+        <span className="hero-ring" aria-hidden="true" />
+        <span className="hero-sweep" aria-hidden="true" />
+        <span
+          className="score-tile"
+          style={{
+            ["--tile-bar" as string]:
+              SEVERITY_COLOR[c.severity] ?? SEVERITY_COLOR.UNSCORED,
+          }}
+          title={c.risk_score === null ? undefined : c.risk_score.toFixed(2)}
+        >
+          <strong>
+            {c.risk_score === null ? "—" : Math.round(c.risk_score)}
+          </strong>
+          <small>of 100</small>
+        </span>
+        <div className="hero-who">
+          <div className="eyebrow" style={{ color: "#a5f3fc" }}>
+            Case {short(id)}
+          </div>
+          <h1 className="account" style={{ color: "#ffffff", margin: "2px 0" }}>
+            {c.account_id}
+          </h1>
+          <p>
+            {label(c.channel)}
+            {typeof data.transaction.context?.destination_account_id ===
+            "string"
+              ? " to " + data.transaction.context.destination_account_id
+              : ""}{" "}
+            on {date(data.transaction.occurred_at)}
+          </p>
+          <div className="hero-tags">
+            <span className={"sev-pill " + c.severity.toLowerCase()}>
+              {c.risk_score === null ? "Not scored" : label(c.severity)}
+            </span>
+            <span className="glass-tag">{label(c.state)}</span>
+            <span className="glass-tag">
+              {c.assigned_to
+                ? c.assigned_to === identity.id
+                  ? "Assigned to you"
+                  : "Assigned to " + short(c.assigned_to)
+                : "Nobody assigned yet"}
+            </span>
+            <span className="glass-tag">Opened {date(c.created_at)}</span>
+          </div>
+        </div>
+        <div className="case-amount">
+          <small>AMOUNT</small>
+          <strong>{money(c.amount_minor, c.currency)}</strong>
+          <div
+            className="heading-actions"
+            style={{ marginTop: 10, justifyContent: "flex-end" }}
+          >
             <Refresh onClick={refresh} />
-          </>
-        }
-      >
-        {money(c.amount_minor, c.currency)} · {c.channel} · {c.external_id}
-      </Title>
-      <div className="case-banner">
-        <div>
-          <span className="eyebrow">PRIORITY</span>
-          <Badge value={c.severity} />
+          </div>
         </div>
-        <div>
-          <span className="eyebrow">RISK SCORE</span>
-          <strong>
-            {c.risk_score === null
-              ? "Unscored"
-              : c.risk_score.toFixed(2) + " / 100"}
-          </strong>
-        </div>
-        <div>
-          <span className="eyebrow">ASSIGNMENT</span>
-          <strong>
-            {c.assigned_to
-              ? c.assigned_to === identity.id
-                ? "Assigned to you"
-                : short(c.assigned_to)
-              : "Unassigned"}
-          </strong>
-        </div>
-        <div>
-          <span className="eyebrow">OPENED</span>
-          <strong>{date(c.created_at)}</strong>
-        </div>
-      </div>
+      </section>
       {c.processing_status === "FAILED" && (
         <div className="notice warning">
           Scoring was unavailable. Review this case manually; it has not been
@@ -307,22 +324,24 @@ export default function CaseWorkspace({
         </div>
       )}
       {action.feedback}
-      <p className="muted">
-        Risk score = the supervised model output × 100. It is not a calibrated
-        probability or certainty. The queue contains alerts, not all payments.
+      <p className="muted" style={{ fontSize: 13 }}>
+        The risk score is the model output times 100. It is not a probability,
+        and the queue holds alerts only, not every payment.
       </p>
       {latestAI && <AIResult finding={latestAI} currentVersion={c.version} />}
-      <Panel title="Transaction details">
-        <div className="panel-body">
-          <ErrorBox error={source.error} />
-          <details open>
-            <summary>Bank transaction · JSON</summary>
-            <pre className="json-payload">
-              {JSON.stringify(source.data ?? data.transaction, null, 2)}
-            </pre>
-          </details>
-        </div>
-      </Panel>
+      {identity.booth_mode && (
+        <Panel title="Bank transaction">
+          <div className="panel-body">
+            <ErrorBox error={source.error} />
+            <details open>
+              <summary>Raw JSON as received from the bank</summary>
+              <pre className="json-payload">
+                {JSON.stringify(source.data ?? data.transaction, null, 2)}
+              </pre>
+            </details>
+          </div>
+        </Panel>
+      )}
       <nav className="tabs" aria-label="Case sections">
         {[
           "Overview",
@@ -531,6 +550,14 @@ export default function CaseWorkspace({
                   <dd>{label(c.review_reason)}</dd>
                 </dl>
                 <Details value={data.transaction.context} />
+                {!identity.booth_mode && (
+                  <details style={{ margin: "16px 0 0" }}>
+                    <summary>Full transaction record (raw JSON)</summary>
+                    <pre className="json-payload">
+                      {JSON.stringify(data.transaction, null, 2)}
+                    </pre>
+                  </details>
+                )}
               </div>
             </Panel>
             {identity.role === "supervisor" && open && (
@@ -617,7 +644,7 @@ export default function CaseWorkspace({
                       <article className="note" key={n.id}>
                         <p>{n.text}</p>
                         <small>
-                          {date(n.created_at)} · {short(n.author_id)}
+                          {date(n.created_at)} by {short(n.author_id)}
                         </small>
                       </article>
                     ))
@@ -803,7 +830,7 @@ export default function CaseWorkspace({
                       onClick={() => setCallId(c.id)}
                     >
                       <span>
-                        {short(c.id)} · {c.language.toUpperCase()}
+                        {short(c.id)} ({c.language.toUpperCase()})
                       </span>
                       <Badge value={c.state} />
                     </button>
@@ -977,7 +1004,7 @@ function Evidence({
                   <div>
                     <strong>{t.external_id}</strong>
                     <small>
-                      {date(t.occurred_at)} · {t.channel}
+                      {date(t.occurred_at)}, {label(t.channel)}
                     </small>
                   </div>
                   <strong>{money(t.amount_minor, t.currency)}</strong>

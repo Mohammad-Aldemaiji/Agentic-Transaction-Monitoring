@@ -50,6 +50,41 @@ export const response = (data: unknown, status = 200) =>
     status,
     headers: { "Content-Type": "application/json" },
   });
+/** Fourteen days of synthetic chart data ending today (UTC). */
+export function trends() {
+  const day = new Date();
+  day.setUTCHours(0, 0, 0, 0);
+  const counts = [
+    [1, 2, 3, 5],
+    [2, 3, 4, 4],
+    [0, 2, 3, 6],
+    [1, 1, 5, 4],
+    [2, 4, 3, 5],
+    [1, 3, 2, 3],
+    [0, 1, 3, 4],
+    [2, 3, 4, 5],
+    [1, 4, 5, 3],
+    [3, 2, 4, 4],
+    [2, 3, 3, 5],
+    [1, 2, 4, 6],
+    [2, 4, 3, 3],
+    [3, 4, 2, 3],
+  ];
+  return {
+    days: counts.map((_, i) =>
+      new Date(day.getTime() - (13 - i) * 864e5).toISOString().slice(0, 10),
+    ),
+    flagged_by_day: counts.map(([CRITICAL, HIGH, MEDIUM, LOW]) => ({
+      CRITICAL,
+      HIGH,
+      MEDIUM,
+      LOW,
+      UNSCORED: 0,
+    })),
+    decided_by_day: [6, 8, 7, 5, 9, 7, 9],
+    decision_hours_by_day: [9.1, 8.4, 8.8, 7.5, 7.0, 7.3, 6.2],
+  };
+}
 export function fixture(path: string) {
   if (path === "/me") return analyst;
   if (path.startsWith("/dashboard"))
@@ -59,6 +94,8 @@ export function fixture(path: string) {
       decisions: { LEGITIMATE: 18, CONFIRMED_FRAUD: 6, INCONCLUSIVE: 3 },
       oldest_open_at: caseRow.created_at,
       review_capacity: null,
+      review_threshold: 40,
+      trends: trends(),
     };
   if (path === "/cases/" + caseId + "/summary") return summary;
   if (path.startsWith("/cases?"))

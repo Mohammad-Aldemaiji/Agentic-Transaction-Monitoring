@@ -212,7 +212,7 @@ export default function Login({
         </div>
         <div className="story-footer">
           <ShieldCheck size={18} />
-          Senior project · Synthetic financial data only
+          Senior project. Synthetic financial data only.
         </div>
       </aside>
       <main className="login-main">
@@ -221,7 +221,7 @@ export default function Login({
             {face ? <ScanFace size={30} /> : <Fingerprint size={30} />}
           </span>
           <div className="eyebrow">
-            {face ? "STEP 2 OF 2 · FACE VERIFICATION" : "SECURE WORKSPACE"}
+            {face ? "STEP 2 OF 2: FACE VERIFICATION" : "SECURE WORKSPACE"}
           </div>
           <h2>
             {face
@@ -449,8 +449,8 @@ export default function Login({
           </div>
           <small className="muted">
             {staffAccess
-              ? "Local application · Supabase password · On-device face matching"
-              : "Local application · Supabase authentication"}
+              ? "Password checked by Supabase. Face matched on this device."
+              : "Sign-in handled by Supabase."}
           </small>
         </div>
       </main>

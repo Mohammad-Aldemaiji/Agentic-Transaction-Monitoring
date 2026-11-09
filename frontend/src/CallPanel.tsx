@@ -69,7 +69,7 @@ function StandardCallPanel({
   }
   return (
     <Panel
-      title={"Verification call · " + short(callId)}
+      title={"Verification call " + short(callId)}
       aside={<Refresh onClick={refresh} />}
     >
       <ErrorBox error={call.error} />
@@ -88,7 +88,7 @@ function StandardCallPanel({
                   : "Simulated bank verification"}
               </strong>
               <small>
-                {c.language === "ar" ? "العربية" : "English"} · Expires{" "}
+                {c.language === "ar" ? "العربية" : "English"}, expires{" "}
                 {date(c.expires_at)}
               </small>
             </div>

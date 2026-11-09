@@ -55,11 +55,11 @@ export default function AIResult({
           </div>
         </div>
         <p className="muted">
-          {String(details.model ?? "Local AI")} · Advisory result. The analyst
+          {String(details.model ?? "Local AI")}. Advisory result. The analyst
           records the decision.
         </p>
         <details>
-          <summary>Full AI response · JSON</summary>
+          <summary>Full AI response (JSON)</summary>
           <pre className="json-payload">{JSON.stringify(details, null, 2)}</pre>
         </details>
       </div>

@@ -57,6 +57,15 @@ def test_capacity_policy_preserves_cases_records_bands_and_requires_new_version(
     assert 0 <= traffic["average_risk_score"] <= 100
     assert traffic["last_received_at"] and response.json()["generated_at"]
     assert response.json()["decided_today"] == 0
+    # Chart series: 14 UTC days of flagged cases by band, 7 days of decisions.
+    trends = response.json()["trends"]
+    assert len(trends["days"]) == len(trends["flagged_by_day"]) == 14
+    assert trends["flagged_by_day"][-1]["CRITICAL"] == 2
+    assert sum(sum(day.values()) for day in trends["flagged_by_day"]) == 2
+    assert trends["decided_by_day"] == [0] * 7
+    assert trends["decision_hours_by_day"] == [None] * 7
+    assert sum(traffic["score_bins_today"]) == 2 and len(traffic["score_bins_today"]) == 10
+    assert response.json()["review_threshold"] is not None
     analyst = env["client"].get("/api/v1/dashboard", headers=env["headers"]())
     assert analyst.json()["review_capacity"] is None
     # Outside the booth, analysts keep case-scoped numbers only (no team-wide traffic).

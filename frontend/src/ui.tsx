@@ -5,20 +5,96 @@ import {
   CheckCircle2,
   LoaderCircle,
   RefreshCw,
-  ShieldCheck,
 } from "lucide-react";
 import { api, ApiError, label } from "./api";
+export type Theme = "light" | "dark";
+const THEME_KEY = "rasid.theme";
+/** The saved theme, else the system preference. Storage may be unavailable. */
+export function initialTheme(): Theme {
+  try {
+    const saved = localStorage.getItem(THEME_KEY);
+    if (saved === "light" || saved === "dark") return saved;
+  } catch {
+    /* private mode or blocked storage: fall through */
+  }
+  try {
+    return window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light";
+  } catch {
+    return "light";
+  }
+}
+export function applyTheme(theme: Theme) {
+  document.documentElement.dataset.theme = theme;
+  document
+    .querySelector('meta[name="theme-color"]')
+    ?.setAttribute("content", theme === "dark" ? "#0a0b24" : "#eef0f8");
+}
+export function useTheme() {
+  const [theme, setTheme] = useState<Theme>(
+    () => (document.documentElement.dataset.theme as Theme) || initialTheme(),
+  );
+  useEffect(() => {
+    applyTheme(theme);
+  }, [theme]);
+  const toggle = () =>
+    setTheme((current) => {
+      const next = current === "dark" ? "light" : "dark";
+      try {
+        localStorage.setItem(THEME_KEY, next);
+      } catch {
+        /* the choice still applies for this visit */
+      }
+      return next;
+    });
+  return { theme, toggle };
+}
+/** Radar mark: a ring, a rotating sweep needle and a contact dot. */
+export function Logo({ size = 32 }: { size?: number }) {
+  return (
+    <svg
+      className="brand-logo"
+      width={size}
+      height={size}
+      viewBox="0 0 48 48"
+      aria-hidden="true"
+    >
+      <defs>
+        <linearGradient id="rasid-mark" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#00c2ff" />
+          <stop offset="1" stopColor="#8b3ffc" />
+        </linearGradient>
+      </defs>
+      <rect width="48" height="48" rx="14" fill="url(#rasid-mark)" />
+      <circle
+        cx="24"
+        cy="24"
+        r="13"
+        fill="none"
+        stroke="#fff"
+        strokeWidth="2.8"
+      />
+      <g className="sweep">
+        <path
+          d="M24 24 33 15"
+          stroke="#fff"
+          strokeWidth="2.8"
+          strokeLinecap="round"
+        />
+        <circle cx="34.5" cy="13.5" r="3.6" fill="#fff" />
+      </g>
+      <circle cx="24" cy="24" r="2.8" fill="#fff" />
+    </svg>
+  );
+}
 export function Brand() {
   return (
     <div className="brand">
-      <span className="brand-mark">
-        <ShieldCheck size={25} />
-      </span>
-      <span>
-        rasid
-        <span className="brand-ar" lang="ar">
-          راصد
-        </span>
+      <Logo />
+      <span>Rasid</span>
+      <span className="brand-ar" lang="ar">
+        راصد
       </span>
     </div>
   );

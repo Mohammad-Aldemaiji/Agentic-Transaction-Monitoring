@@ -6,15 +6,17 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  Moon,
   Phone,
   Settings2,
   ShieldCheck,
   Sparkles,
+  Sun,
   X,
 } from "lucide-react";
-import { api, clearSession, hasSession, label, short } from "./api";
+import { api, clearSession, hasSession, label } from "./api";
 import { supabase } from "./auth";
-import { Brand, ErrorBox, Loading } from "./ui";
+import { Brand, ErrorBox, Loading, useTheme } from "./ui";
 import Login from "./Login";
 import StaffUsers from "./StaffUsers";
 import AccountSetup, { hasAccountSetup } from "./AccountSetup";
@@ -31,7 +33,7 @@ export const navigation = [
   { id: "users", name: "Users", icon: ShieldCheck, roles: ["admin"] },
   {
     id: "queue",
-    name: "Review queue",
+    name: "Overview",
     icon: LayoutDashboard,
     roles: ["analyst", "supervisor", "auditor"],
   },
@@ -75,6 +77,7 @@ export default function App() {
     [caseId, setCaseId] = useState(""),
     [menu, setMenu] = useState(false),
     [busy, setBusy] = useState(false);
+  const { theme, toggle: toggleTheme } = useTheme();
   useEffect(() => {
     let live = true;
     api<{ enabled: boolean; staff_access?: boolean }>("/booth/config")
@@ -172,96 +175,67 @@ export default function App() {
       <a className="skip-link" href="#main">
         Skip to main content
       </a>
-      <aside className={"sidebar " + (menu ? "open" : "")}>
-        <div className="sidebar-brand">
-          <Brand />
+      <div className="aurora" aria-hidden="true">
+        <span />
+        <span />
+      </div>
+      <header className="topnav">
+        <div className="topnav-inner">
           <button
-            className="icon-button mobile-only"
-            aria-label="Close navigation"
-            onClick={() => setMenu(false)}
+            className="glass-button mobile-only"
+            aria-label={menu ? "Close navigation" : "Open navigation"}
+            aria-expanded={menu}
+            onClick={() => setMenu((m) => !m)}
           >
-            <X size={20} />
+            {menu ? <X size={18} /> : <Menu size={18} />}
           </button>
-        </div>
-        <div className="workspace-label">MONITORING WORKSPACE</div>
-        <nav aria-label="Main navigation">
-          {items.map((n) => (
-            <button
-              key={n.id}
-              className={selected.id === n.id ? "active" : ""}
-              aria-current={selected.id === n.id ? "page" : undefined}
-              onClick={() => {
-                setPage(n.id);
-                setCaseId("");
-                setMenu(false);
-              }}
-            >
-              <n.icon size={18} />
-              {n.name}
-              {selected.id === n.id && <span className="nav-dot" />}
-            </button>
-          ))}
-        </nav>
-        <div className="sidebar-bottom">
-          <div className="project-tag">
-            <span className="live-dot" />
-            <div>
-              <strong>Senior project</strong>
-              <small>Synthetic-data environment</small>
-            </div>
-          </div>
-          <div className="user-card">
-            <span className="avatar">
-              {identity.role.slice(0, 2).toUpperCase()}
-            </span>
-            <div>
-              <strong>{label(identity.role)}</strong>
-              <small>
-                {booth
-                  ? "Bank operations"
-                  : `${identity.team} · ${short(identity.id)}`}
-              </small>
-            </div>
-            <button
-              className="icon-button"
-              disabled={busy}
-              title="Sign out"
-              aria-label="Sign out"
-              onClick={logout}
-            >
-              <LogOut size={18} />
-            </button>
-          </div>
-        </div>
-      </aside>
-      {menu && (
-        <button
-          className="scrim"
-          aria-label="Close navigation"
-          onClick={() => setMenu(false)}
-        />
-      )}
-      <div className="main-shell">
-        <header className="topbar">
-          <div>
-            <button
-              className="icon-button mobile-only"
-              aria-label="Open navigation"
-              onClick={() => setMenu(true)}
-            >
-              <Menu size={21} />
-            </button>
-            <span>Workspace</span>
-            <span className="slash">/</span>
-            <strong>{selected.name}</strong>
-          </div>
-          <div className="topbar-right">
-            <span className="environment">
+          <Brand />
+          <nav
+            aria-label="Main navigation"
+            className={"topnav-links" + (menu ? " open" : "")}
+          >
+            {items.map((n) => (
+              <button
+                key={n.id}
+                aria-current={selected.id === n.id ? "page" : undefined}
+                onClick={() => {
+                  setPage(n.id);
+                  setCaseId("");
+                  setMenu(false);
+                }}
+              >
+                <n.icon size={16} />
+                {n.name}
+              </button>
+            ))}
+          </nav>
+          <div className="topnav-actions">
+            <span className="env-pill" title="Synthetic-data environment">
               <span className="live-dot" />
               Sample data
             </span>
             <button
-              className="text-button"
+              className="glass-button"
+              onClick={toggleTheme}
+              aria-label={
+                theme === "dark"
+                  ? "Switch to light theme"
+                  : "Switch to dark theme"
+              }
+              title={
+                theme === "dark"
+                  ? "Switch to light theme"
+                  : "Switch to dark theme"
+              }
+            >
+              {theme === "dark" ? (
+                <Sun key="sun" className="turn" size={17} />
+              ) : (
+                <Moon key="moon" className="turn" size={17} />
+              )}
+            </button>
+            <button
+              className="glass-button"
               onClick={() => {
                 setIdentity(null);
                 setCaseId("");
@@ -273,10 +247,33 @@ export default function App() {
               }
             >
               <Settings2 size={16} />
-              Re-authenticate
+              <span className="search-hint">Re-authenticate</span>
+            </button>
+            <div
+              className="user-chip"
+              title={"Signed in as " + label(identity.role)}
+            >
+              <span className="avatar">
+                {identity.role.slice(0, 2).toUpperCase()}
+              </span>
+              <div>
+                <strong>{label(identity.role)}</strong>
+                <small>{booth ? "Bank operations" : identity.team}</small>
+              </div>
+            </div>
+            <button
+              className="glass-button"
+              disabled={busy}
+              title="Sign out"
+              aria-label="Sign out"
+              onClick={logout}
+            >
+              <LogOut size={16} />
             </button>
           </div>
-        </header>
+        </div>
+      </header>
+      <div className="main-shell">
         <main id="main" tabIndex={-1}>
           <ErrorBox error={error} />
           {identity.sample_traffic_enabled && !booth && <SampleTraffic />}
@@ -293,7 +290,7 @@ export default function App() {
                 />
               </Suspense>
             ) : (
-              <Queue openCase={setCaseId} />
+              <Queue openCase={setCaseId} me={identity.id} />
             )
           ) : selected.id === "transactions" ? (
             booth ? (

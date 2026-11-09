@@ -132,14 +132,14 @@ export default function ScoringDemo() {
         >
           {data.customers.map((c, i) => (
             <option key={c.account_id} value={i}>
-              {c.name} · {c.transactions} transactions · {c.scenario}
+              {c.name}, {c.transactions} transactions, {c.scenario}
             </option>
           ))}
         </select>
       </Field>
       <p>
-        {customer.account_id} · {customer.transactions} recorded transactions ·{" "}
-        {customer.evaluated} evaluated · {customer.fraud} known fraud labels
+        {customer.account_id}: {customer.transactions} recorded transactions,{" "}
+        {customer.evaluated} evaluated, {customer.fraud} known fraud labels
         across the history.
       </p>
       <label>
@@ -175,7 +175,7 @@ export default function ScoringDemo() {
                 <td>
                   {row.amount.toLocaleString()} {row.currency}
                   <br />
-                  {row.channel} · {row.authorization}
+                  {row.channel}, {row.authorization}
                 </td>
                 <td>
                   {row.fraud_label ? "Labelled fraud" : "Labelled normal"}

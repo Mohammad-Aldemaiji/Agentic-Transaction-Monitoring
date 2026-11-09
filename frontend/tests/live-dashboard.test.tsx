@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import Queue, { LIVE_MS, ago } from "../src/Queue";
 import { fixture, response } from "./fixtures";
 
@@ -56,20 +56,27 @@ const calls = (prefix: string) =>
 it("updates the number cards by itself without reloading the queue list", async () => {
   render(<Queue openCase={() => {}} />);
   expect(await screen.findByText("1,300")).toBeInTheDocument();
-  expect(screen.getByText("Live")).toBeInTheDocument();
+  expect(screen.getByText(/^Live, updated/)).toBeInTheDocument();
   expect(screen.getByText("Live transaction flow")).toBeInTheDocument();
   expect(
-    screen.getByText("10.8% of received · +13 last hour"),
+    screen.getByText("10.8% of received, 13 in the last hour"),
   ).toBeInTheDocument();
   expect(screen.getByText("23.40")).toBeInTheDocument();
-  expect(screen.getByText("4 decisions today (UTC)")).toBeInTheDocument();
-  expect(screen.getByText("24")).toBeInTheDocument(); // 9 + 12 + 3 open cases
+  const kpi = (name: string) => within(screen.getByRole("region", { name }));
+  // Numbers ease in, so wait for them to settle.
+  expect(await kpi("Decided today").findByText("4")).toBeInTheDocument();
+  expect(await kpi("Open cases").findByText("24")).toBeInTheDocument(); // 9 + 12 + 3 open
   const queueLoads = calls("/cases?");
   await act(async () => {
     await vi.advanceTimersByTimeAsync(LIVE_MS);
   });
   expect(await screen.findByText("1,400")).toBeInTheDocument();
-  expect(screen.getByText("25")).toBeInTheDocument();
+  expect(await kpi("Open cases").findByText("25")).toBeInTheDocument();
+  // A new case between live updates is announced, but the list is not reloaded.
+  expect(screen.getByText("New case flagged")).toBeInTheDocument();
+  expect(
+    screen.getByRole("img", { name: /cases flagged in the last 14 days/ }),
+  ).toBeInTheDocument();
   expect(screen.getByText("1,400").closest(".stat")).toHaveClass("changed");
   expect(calls("/dashboard")).toBe(2);
   expect(calls("/cases?")).toBe(queueLoads);

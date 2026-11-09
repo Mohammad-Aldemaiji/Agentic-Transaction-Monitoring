@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import Queue from "../src/Queue";
 import CaseWorkspace from "../src/CaseWorkspace";
@@ -20,14 +26,20 @@ it("shows real response values and opens the chosen case", async () => {
   const open = vi.fn();
   render(<Queue openCase={open} />);
   await screen.findByText("SYN-ACCOUNT-1042");
-  expect(screen.getByText("87.00")).toBeInTheDocument();
+  // The rounded score is shown; the exact value stays available on hover.
+  expect(screen.getByTitle("87.00")).toHaveTextContent("87");
   await userEvent.click(screen.getByText("CASE-AAAAAAAA"));
   expect(open).toHaveBeenCalledWith(caseId);
 });
 it("sends filters to the server, not just the currently displayed page", async () => {
   render(<Queue openCase={() => {}} />);
   await screen.findByText("SYN-ACCOUNT-1042");
-  await userEvent.selectOptions(screen.getByLabelText("Severity"), "HIGH");
+  await userEvent.click(
+    within(screen.getByRole("group", { name: "Filter by priority" })).getByRole(
+      "button",
+      { name: "High" },
+    ),
+  );
   await waitFor(() =>
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining("severity=HIGH"),

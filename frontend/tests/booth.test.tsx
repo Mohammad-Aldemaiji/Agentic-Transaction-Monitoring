@@ -44,7 +44,7 @@ it("limits an analyst to their assigned workspace after sign-in", async () => {
   await userEvent.click(
     screen.getByRole("button", { name: "Complete verified sign-in" }),
   );
-  await screen.findByText("Every signal, in focus.");
+  await screen.findByRole("heading", { name: "Overview" });
   for (const name of [
     "Bank feed",
     "Supervisor",
