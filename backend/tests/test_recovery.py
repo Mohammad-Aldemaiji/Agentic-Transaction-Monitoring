@@ -3,7 +3,7 @@ from uuid import uuid4
 
 import pytest
 from sqlalchemy import func, select
-from test_workflows import case_for, post, submit
+from test_workflows import case_for, post, propose_after_review, submit
 
 from atm_backend.adapters import SimulationScorer
 from atm_backend.models import Case, Execution, Job, Proposal, Transaction
@@ -106,7 +106,7 @@ def test_parallel_workers_claim_distinct_jobs(env, transaction_body):
 
 def test_approval_fails_closed_when_audit_cannot_persist(env, transaction_body, monkeypatch):
     cid = case_for(env, transaction_body)
-    proposal = post(
+    proposal = propose_after_review(
         env,
         f"cases/{cid}/action-proposals",
         {
@@ -134,7 +134,7 @@ def test_approval_fails_closed_when_audit_cannot_persist(env, transaction_body, 
 
 def test_crash_after_mock_action_cannot_duplicate_execution(env, transaction_body):
     cid = case_for(env, transaction_body)
-    proposal = post(
+    proposal = propose_after_review(
         env,
         f"cases/{cid}/action-proposals",
         {

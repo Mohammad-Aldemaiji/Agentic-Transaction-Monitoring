@@ -251,9 +251,7 @@ def register(app: FastAPI) -> None:
         pending = s.scalar(
             select(func.count())
             .select_from(Proposal)
-            .where(
-                Proposal.case_id == c.id, Proposal.state == "PENDING", Proposal.expires_at > now()
-            )
+            .where(Proposal.case_id == c.id, Proposal.state == "PENDING")
         )
         unfinished = s.scalar(
             select(func.count())

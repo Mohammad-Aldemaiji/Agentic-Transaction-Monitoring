@@ -10,6 +10,19 @@ export class ApiError extends Error {
 }
 export function errorText(status: number, code: string) {
   const messages: Record<string, string> = {
+    investigation_steps_incomplete:
+      "Complete the four evidence reviews before submitting a recommendation.",
+    previous_step_required: "Complete the previous review step first.",
+    investigation_required: "Begin or resume this investigation first.",
+    current_assessment_required:
+      "Run a current AI assessment or select manual assessment and explain your review.",
+    verification_outcome_required:
+      "Finish customer verification or select contact not required and explain why.",
+    supervisor_review_required:
+      "Review an analyst recommendation before recording the final decision.",
+    pending_proposals:
+      "A recommendation is awaiting supervisor review. Review or withdraw it before continuing.",
+
     cannot_reset_own_account:
       "Use Forgot password on the sign-in page to reset your own password.",
     cannot_change_own_access:

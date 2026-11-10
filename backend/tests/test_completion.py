@@ -3,7 +3,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy import func, select, text
-from test_workflows import case_for, post, submit
+from test_workflows import case_for, post, propose_after_review, submit
 
 from atm_backend.adapters import Score, ScoringUnavailable
 from atm_backend.models import Audit, Case, PolicyVersion, Proposal, RateBucket, Transaction, now
@@ -83,20 +83,20 @@ def test_invalid_provider_scores_fail_closed(score):
         Score(False, "invalid-provider", score, False, ["TEST_ONLY"])
 
 
-def test_expired_proposals_are_audited_once(env, transaction_body, monkeypatch):
+def test_pending_proposals_remain_available_until_review(env, transaction_body, monkeypatch):
     cid = case_for(env, transaction_body)
-    proposal = post(
+    proposal = propose_after_review(
         env,
         f"cases/{cid}/action-proposals",
         {"expected_version": 1, "action": "HOLD_TRANSFER", "reason": "Synthetic review"},
     ).json()
-    future = now() + timedelta(minutes=11)
+    future = now() + timedelta(days=30)
     monkeypatch.setattr("atm_backend.worker.now", lambda: future)
     expire_waits(env["runtime"])
     expire_waits(env["runtime"])
     with env["factory"]() as s:
-        assert s.get(Proposal, UUID(proposal["id"])).state == "EXPIRED"
-        assert len(list(s.scalars(select(Audit).where(Audit.kind == "action.expired")))) == 1
+        assert s.get(Proposal, UUID(proposal["id"])).state == "PENDING"
+        assert len(list(s.scalars(select(Audit).where(Audit.kind == "action.expired")))) == 0
 
 
 def test_bank_and_customer_turns_share_versioned_call(env, transaction_body):

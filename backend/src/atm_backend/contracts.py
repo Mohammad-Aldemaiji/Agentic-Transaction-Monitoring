@@ -171,3 +171,9 @@ class TrainingCancel(Input):
 
 class SampleTrafficInput(Input):
     offset: Literal[0, 10, 20, 30, 40]
+
+
+class InvestigationStepInput(VersionInput):
+    step: Literal["overview", "scoring", "assessment", "verification"]
+    outcome: Literal["REVIEWED", "MANUAL_REVIEW", "NOT_REQUIRED"] = "REVIEWED"
+    reason: Reason

@@ -106,7 +106,10 @@ it("shows newer AI findings after refresh and marks changed evidence", async () 
   );
   render(<CaseWorkspace id={caseId} identity={analyst} onBack={() => {}} />);
   await userEvent.click(
-    await screen.findByRole("button", { name: "Analyse with local AI" }),
+    await screen.findByRole("button", { name: "AI assessment" }),
+  );
+  await userEvent.click(
+    await screen.findByRole("button", { name: "Analyze with local AI" }),
   );
   await screen.findByText("Older AI assessment");
   version = 6;
@@ -116,7 +119,7 @@ it("shows newer AI findings after refresh and marks changed evidence", async () 
   expect(screen.queryByText("Older AI assessment")).not.toBeInTheDocument();
   version = 7;
   await userEvent.click(screen.getByRole("button", { name: "Refresh" }));
-  await screen.findByText(/Evidence has changed since this assessment/);
+  await screen.findByText(/Evidence has changed/);
 });
 
 it("keeps playback available when a refreshed call needs a browser audio gesture", async () => {

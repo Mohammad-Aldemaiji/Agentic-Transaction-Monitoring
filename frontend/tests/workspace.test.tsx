@@ -73,7 +73,13 @@ it("requires confirmation and sends the reviewed case version in a decision", as
     response(fixture(String(input).replace("/api/v1", ""))),
   );
   vi.stubGlobal("fetch", fetch);
-  render(<CaseWorkspace id={caseId} identity={analyst} onBack={() => {}} />);
+  render(
+    <CaseWorkspace
+      id={caseId}
+      identity={{ ...analyst, role: "supervisor" }}
+      onBack={() => {}}
+    />,
+  );
   const reason = await screen.findByLabelText("Decision rationale");
   await userEvent.type(reason, "Reviewed the synthetic evidence");
   await userEvent.click(screen.getByLabelText(/I have reviewed/));
@@ -104,7 +110,13 @@ it("blocks closure while a customer call remains active", async () => {
       ),
     ),
   );
-  render(<CaseWorkspace id={caseId} identity={analyst} onBack={() => {}} />);
+  render(
+    <CaseWorkspace
+      id={caseId}
+      identity={{ ...analyst, role: "supervisor" }}
+      onBack={() => {}}
+    />,
+  );
   expect(
     await screen.findByRole("button", { name: "Record final decision" }),
   ).toBeDisabled();
@@ -187,7 +199,10 @@ it("requests a version-bound AI recommendation without proposing or approving an
   vi.stubGlobal("fetch", request);
   render(<CaseWorkspace id={caseId} identity={analyst} onBack={() => {}} />);
   await userEvent.click(
-    await screen.findByRole("button", { name: "Analyse with local AI" }),
+    await screen.findByRole("button", { name: "AI assessment" }),
+  );
+  await userEvent.click(
+    await screen.findByRole("button", { name: "Analyze with local AI" }),
   );
   await waitFor(() =>
     expect(request).toHaveBeenCalledWith(

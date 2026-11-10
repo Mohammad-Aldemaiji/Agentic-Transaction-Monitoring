@@ -27,11 +27,30 @@ Originated by Mohammad Aldemaiji; this version integrates his E05 model and loca
 | Role | Purpose |
 |---|---|
 | Bank feed (administrator function) | Replay synthetic transactions and inspect customer histories and processing results. |
-| Analyst | Investigate flagged cases, review evidence and AI advice, perform simulated verification, propose actions and record final decisions. |
-| Supervisor | Oversee cases and approve/reject eligible actions independently of the proposing analyst. |
+| Analyst | Investigate flagged cases, review evidence and AI advice, perform simulated verification and propose actions. |
+| Supervisor | Oversee cases, independently approve/reject eligible actions and record final decisions. |
 | Administrator | Manage staff accounts, synthetic intake, policy/model proposals, reviewed datasets and operational processing. Administrator access does not imply supervisor approval authority. |
 
 The local staff workspace uses one assigned role per account. Role-switching controls have been removed. Another administrator must change your role, disable or delete your account, or send you an administrative reset email. Personal password recovery remains available through Forgot password.
+
+## Investigation workspace
+
+Analysts begin an investigation and move freely between Overview, Evidence, AI assessment,
+Notes & findings, Calls, Actions and Timeline. There is no required step sequence or
+per-step review note. In Actions, analysts submit a reasoned recommendation,
+including No action, to an independent supervisor. Only supervisors record final case
+outcomes, after review and any approved simulated execution. Returned proposals can be
+revised and resubmitted. Changes to evidence block approval of an outdated proposal.
+
+Pending recommendations no longer expire automatically. Historical expired records stay
+in the audit trail and can be reviewed before a new submission. The local launcher updates
+the proposal expiry column automatically. Other deployment profiles must apply
+`backend/deploy/guided-investigation.sql` as the schema owner before deploying this version.
+The worker and API must be upgraded together.
+
+Scoring evidence includes a labelled score ring and recorded feature-contribution bars.
+AI assessments separate concerning signals, reassuring evidence and follow-up guidance.
+Technical records stay collapsed. Animations honor the system reduced-motion preference.
 
 ## Transaction workflow
 
@@ -41,7 +60,7 @@ Bank feed → durable intake → approved supervised model → recorded risk pol
   └─ flagged or scoring unavailable after retries: manual-review case
        → investigation + optional local AI + verification evidence
        → proposed action → independent approval when required
-       → simulated execution → analyst's final decision
+       → simulated execution → supervisor's final decision
 ```
 
 Analysts review flagged cases, not every received payment. A customer confirmation or an AI recommendation cannot authorize a bank action. This application monitors and simulates responses; a real bank's authorization, settlement and account balances are outside its integration.

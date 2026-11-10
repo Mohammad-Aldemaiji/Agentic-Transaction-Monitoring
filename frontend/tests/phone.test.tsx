@@ -87,5 +87,5 @@ it("shows the returned AI explanation and full response", () => {
     screen.getByText("Verify with the account holder"),
   ).toBeInTheDocument();
   expect(screen.getByText("Known device")).toBeInTheDocument();
-  expect(screen.getByText("Full AI response (JSON)")).toBeInTheDocument();
+  expect(screen.getByText("Supporting technical details")).toBeInTheDocument();
 });

@@ -53,6 +53,7 @@ def proposal(row: Any) -> dict[str, Any]:
             "proposer_id",
             "approver_id",
             "expires_at",
+            "created_at",
         ),
         "simulation": True,
     }

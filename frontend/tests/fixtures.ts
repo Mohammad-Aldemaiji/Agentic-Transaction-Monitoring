@@ -86,6 +86,9 @@ export function trends() {
   };
 }
 export function fixture(path: string) {
+  if (path.includes("/evidence?"))
+    return { history: [], as_of: caseRow.created_at, next_cursor: null };
+  if (path.endsWith("/investigation-progress")) return {};
   if (path === "/me") return analyst;
   if (path.startsWith("/dashboard"))
     return {

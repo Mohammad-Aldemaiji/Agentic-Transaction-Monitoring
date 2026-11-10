@@ -4,7 +4,7 @@ from uuid import UUID
 import pytest
 from sqlalchemy import select, text
 from sqlalchemy.exc import DBAPIError
-from test_workflows import case_for, post
+from test_workflows import case_for, post, propose_after_review
 
 from atm_backend.adapters import SimulationScorer
 from atm_backend.models import Audit, Case, Event, Execution, Job, Proposal
@@ -13,7 +13,7 @@ from atm_backend.worker import process, run_one
 
 def proposal_for(env, body, approved=True):
     cid = case_for(env, body)
-    response = post(
+    response = propose_after_review(
         env,
         f"cases/{cid}/action-proposals",
         {"expected_version": 1, "action": "HOLD_TRANSFER", "reason": "Synthetic transfer review"},
@@ -56,13 +56,13 @@ def test_approved_work_blocks_closure_and_evidence_changes_until_receipt(env, tr
             {"expected_version": 1, "action": "NO_ACTION", "reason": "Another action"},
         ),
     ]:
-        response = post(env, path, body)
+        response = post(env, path, body, "supervisor" if path.endswith("/decisions") else "analyst")
         assert (
             response.status_code == 409
             and response.json()["error"]["code"] == "approved_action_pending"
         )
     assert run_one(env["runtime"], SimulationScorer())
-    assert post(env, f"cases/{cid}/decisions", decision).status_code == 201
+    assert post(env, f"cases/{cid}/decisions", decision, who="supervisor").status_code == 201
 
 
 def test_cancel_requires_scope_supervisor_and_fresh_auth_then_releases_case(env, transaction_body):

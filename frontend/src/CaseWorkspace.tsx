@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeft, FileText, Phone, ShieldCheck } from "lucide-react";
 import { api, date, label, money, short } from "./api";
 import {
@@ -15,6 +15,7 @@ import {
 } from "./ui";
 import CallPanel from "./CallPanel";
 import AIResult from "./AIResult";
+import ScoringEvidence, { ReadableEvidence } from "./ScoringEvidence";
 import { SEVERITY_COLOR } from "./Charts";
 import type {
   Call,
@@ -72,10 +73,14 @@ function ProposalCard({
   p,
   identity,
   onChange,
+  currentVersion,
+  onResubmit,
 }: {
   p: Proposal;
   identity: Identity;
   onChange: () => void;
+  currentVersion: number;
+  onResubmit: () => void;
 }) {
   const action = useAction(onChange),
     execution = useResource<{
@@ -98,7 +103,9 @@ function ProposalCard({
       <p>{p.reason}</p>
       <Details value={p.target} />
       <small className="muted">
-        Evidence version {p.evidence_version}, expires {date(p.expires_at)}
+        Evidence version {p.evidence_version}
+        {p.state === "PENDING" ? " · Pending until supervisor review" : ""}
+        {p.created_at ? " · Submitted " + date(p.created_at) : ""}
       </small>
       <ErrorBox error={execution.error} />
       {execution.data && (
@@ -109,11 +116,23 @@ function ProposalCard({
       {execution.data?.receipt !== undefined && (
         <Details value={execution.data.receipt} />
       )}
+      {p.state === "PENDING" && p.evidence_version !== currentVersion && (
+        <p className="notice warning">
+          Evidence changed after submission. Return or withdraw this
+          recommendation and submit a revised review before approval.
+        </p>
+      )}
+      {p.state === "EXPIRED" && identity.role === "analyst" && (
+        <button className="secondary" onClick={onResubmit}>
+          Review and resubmit
+        </button>
+      )}
       {action.feedback}
       <fieldset disabled={action.busy}>
         {p.state === "PENDING" && canApprove && (
           <div className="button-row">
             <button
+              disabled={p.evidence_version !== currentVersion}
               onClick={() =>
                 action.run(
                   () =>
@@ -166,7 +185,7 @@ function ProposalCard({
                 );
               }}
             >
-              <Field label="Cancellation reason">
+              <Field label="Reason for withdrawal or further investigation">
                 <input
                   minLength={5}
                   maxLength={2000}
@@ -175,7 +194,11 @@ function ProposalCard({
                   onChange={(e) => setReason(e.target.value)}
                 />
               </Field>
-              <button className="secondary danger">Cancel proposal</button>
+              <button className="secondary danger">
+                {identity.role === "supervisor"
+                  ? "Return for further investigation"
+                  : "Withdraw proposal"}
+              </button>
             </form>
           )}
       </fieldset>
@@ -237,6 +260,12 @@ export default function CaseWorkspace({
     .filter((finding) => finding.details?.source === "local_llm")
     .sort((a, b) => Number(b.id) - Number(a.id))[0];
   const data = summary.data;
+  useEffect(() => {
+    if (!data?.pending_proposals && !data?.unfinished_approved_actions) return;
+    const timer = setInterval(() => setRev((x) => x + 1), 5000);
+    return () => clearInterval(timer);
+  }, [data?.pending_proposals, data?.unfinished_approved_actions]);
+
   function mutate(path: string, body: unknown, method = "POST") {
     return api(path, { method, body });
   }
@@ -328,12 +357,12 @@ export default function CaseWorkspace({
         The risk score is the model output times 100. It is not a probability,
         and the queue holds alerts only, not every payment.
       </p>
-      {latestAI && <AIResult finding={latestAI} currentVersion={c.version} />}
+
       {identity.booth_mode && (
         <Panel title="Bank transaction">
           <div className="panel-body">
             <ErrorBox error={source.error} />
-            <details open>
+            <details>
               <summary>Raw JSON as received from the bank</summary>
               <pre className="json-payload">
                 {JSON.stringify(source.data ?? data.transaction, null, 2)}
@@ -346,370 +375,654 @@ export default function CaseWorkspace({
         {[
           "Overview",
           "Evidence",
+          "AI assessment",
           "Notes & findings",
           "Calls",
           "Actions",
           "Timeline",
         ].map((t) => (
           <button
-            aria-current={tab === t ? "page" : undefined}
-            className={tab === t ? "active" : ""}
             key={t}
+            className={tab === t ? "active" : ""}
+            aria-current={tab === t ? "page" : undefined}
             onClick={() => setTab(t)}
           >
             {t}
           </button>
         ))}
       </nav>
-      {tab === "Overview" && (
-        <div className="case-columns">
-          <div>
-            <Panel title="Investigation" aside={<FileText size={19} />}>
+      <div className="investigation-stage" key={tab}>
+        {tab === "AI assessment" && (
+          <>
+            <Panel title="Assess the evidence">
               <div className="panel-body">
                 <p>
-                  {data.investigation
-                    ? "Investigation status: " + label(data.investigation.state)
-                    : "Start an investigation to review this transaction and contact the customer."}
+                  Use local AI to organize supporting evidence. Review the
+                  result alongside the scoring evidence and customer history.
+                  Record your conclusions in Notes & findings.
                 </p>
-                {write && open && (
-                  <fieldset disabled={action.busy}>
-                    <div className="button-row">
-                      {(!data.investigation ||
-                        data.investigation.state === "CANCELLED") && (
-                        <button
-                          onClick={() =>
-                            action.run(() =>
-                              mutate("/cases/" + id + "/investigations", {
-                                ...version,
-                                operation: data.investigation
-                                  ? "resume"
-                                  : "start",
-                              }),
-                            )
-                          }
-                        >
-                          {data.investigation
-                            ? "Resume investigation"
-                            : "Start investigation"}
-                        </button>
-                      )}
-                      {data.investigation?.state === "ACTIVE" && (
-                        <button
-                          className="secondary"
-                          disabled={
-                            !data.local_agent_enabled || !!data.active_call
-                          }
-                          title={
-                            !data.local_agent_enabled
-                              ? "Local AI is not configured"
-                              : undefined
-                          }
-                          onClick={() =>
-                            action.run(async () => {
-                              const result = await api<Event>(
-                                "/cases/" + id + "/agent-analysis",
-                                {
-                                  method: "POST",
-                                  body: version,
-                                  signal: AbortSignal.timeout(155000),
-                                },
-                              );
-                              setAiResult(result);
-                            }, "Analysis complete. The result is displayed below.")
-                          }
-                        >
-                          {action.busy ? "Analysing…" : "Analyse with local AI"}
-                        </button>
-                      )}
-                      {data.investigation?.state === "ACTIVE" && (
-                        <button
-                          className="secondary danger"
-                          onClick={() =>
-                            action.run(() =>
-                              mutate("/cases/" + id + "/investigations", {
-                                ...version,
-                                operation: "cancel",
-                              }),
-                            )
-                          }
-                        >
-                          Cancel investigation
-                        </button>
-                      )}
-                    </div>
-                  </fieldset>
+                {write && open && data.investigation?.state === "ACTIVE" && (
+                  <button
+                    disabled={
+                      action.busy ||
+                      !data.local_agent_enabled ||
+                      !!data.active_call
+                    }
+                    onClick={() =>
+                      action.run(async () => {
+                        const result = await api<Event>(
+                          "/cases/" + id + "/agent-analysis",
+                          {
+                            method: "POST",
+                            body: version,
+                            signal: AbortSignal.timeout(155000),
+                          },
+                        );
+                        setAiResult(result);
+                      }, "Assessment ready. Review the findings below.")
+                    }
+                  >
+                    {action.busy
+                      ? "Assessing evidence…"
+                      : "Analyze with local AI"}
+                  </button>
                 )}
-                <div className="facts">
-                  <div>
-                    <span>Notes</span>
-                    <strong>{data.counts?.notes ?? "—"}</strong>
-                  </div>
-                  <div>
-                    <span>Pending approvals</span>
-                    <strong>{data.pending_proposals}</strong>
-                  </div>
-                  <div>
-                    <span>Actions awaiting execution</span>
-                    <strong>{data.unfinished_approved_actions}</strong>
-                  </div>
-                </div>
+                {!data.local_agent_enabled && (
+                  <p className="muted">
+                    Local AI is unavailable. You can complete a manual
+                    assessment and record your reasoning.
+                  </p>
+                )}
+                {action.busy && (
+                  <p className="assessment-loading" role="status">
+                    Analyzing transaction context and customer history…
+                  </p>
+                )}
               </div>
             </Panel>
-            <Panel title="Final decision" aside={<ShieldCheck size={19} />}>
-              <div className="panel-body">
-                {data.decision ? (
-                  <>
-                    <Badge value={data.decision.disposition} />
-                    <p>{data.decision.reason}</p>
-                    <small>{date(data.decision.created_at)}</small>
-                  </>
-                ) : write && open ? (
+            {latestAI ? (
+              <AIResult finding={latestAI} currentVersion={c.version} />
+            ) : (
+              <Empty title="Your assessment starts here">
+                Run local AI or review the evidence manually. Record the
+                approach and rationale in Notes & findings.
+              </Empty>
+            )}
+          </>
+        )}
+        {tab === "Overview" && (
+          <div className="case-columns">
+            <div>
+              <Panel title="Investigation" aside={<FileText size={19} />}>
+                <div className="panel-body">
+                  <p>
+                    {data.investigation
+                      ? "Investigation status: " +
+                        label(data.investigation.state)
+                      : "Start an investigation to review this transaction and contact the customer."}
+                  </p>
+                  {write && open && (
+                    <fieldset disabled={action.busy}>
+                      <div className="button-row">
+                        {(!data.investigation ||
+                          data.investigation.state === "CANCELLED") && (
+                          <button
+                            onClick={() =>
+                              action.run(() =>
+                                mutate("/cases/" + id + "/investigations", {
+                                  ...version,
+                                  operation: data.investigation
+                                    ? "resume"
+                                    : "start",
+                                }),
+                              )
+                            }
+                          >
+                            {data.investigation
+                              ? "Resume investigation"
+                              : "Begin investigation"}
+                          </button>
+                        )}
+                        {data.investigation?.state === "ACTIVE" && (
+                          <button
+                            className="secondary danger"
+                            onClick={() =>
+                              action.run(() =>
+                                mutate("/cases/" + id + "/investigations", {
+                                  ...version,
+                                  operation: "cancel",
+                                }),
+                              )
+                            }
+                          >
+                            Cancel investigation
+                          </button>
+                        )}
+                      </div>
+                    </fieldset>
+                  )}
+                  <div className="facts">
+                    <div>
+                      <span>Notes</span>
+                      <strong>{data.counts?.notes ?? "—"}</strong>
+                    </div>
+                    <div>
+                      <span>Pending approvals</span>
+                      <strong>{data.pending_proposals}</strong>
+                    </div>
+                    <div>
+                      <span>Actions awaiting execution</span>
+                      <strong>{data.unfinished_approved_actions}</strong>
+                    </div>
+                  </div>
+                </div>
+              </Panel>
+              {(identity.role === "supervisor" || data.decision) && (
+                <Panel title="Final decision" aside={<ShieldCheck size={19} />}>
+                  <div className="panel-body">
+                    {data.decision ? (
+                      <>
+                        <Badge value={data.decision.disposition} />
+                        <p>{data.decision.reason}</p>
+                        <small>{date(data.decision.created_at)}</small>
+                      </>
+                    ) : identity.role === "supervisor" && open ? (
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          action.run(
+                            () =>
+                              mutate("/cases/" + id + "/decisions", {
+                                ...version,
+                                disposition,
+                                reason,
+                              }),
+                            "Final decision recorded.",
+                          );
+                        }}
+                      >
+                        <fieldset
+                          disabled={
+                            action.busy ||
+                            data.pending_proposals > 0 ||
+                            !!data.active_call ||
+                            data.unfinished_approved_actions > 0
+                          }
+                        >
+                          <Field label="Disposition">
+                            <select
+                              value={disposition}
+                              onChange={(e) => setDisposition(e.target.value)}
+                            >
+                              <option value="INCONCLUSIVE">Inconclusive</option>
+                              <option value="LEGITIMATE">Legitimate</option>
+                              <option value="CONFIRMED_FRAUD">
+                                Confirmed fraud
+                              </option>
+                            </select>
+                          </Field>
+                          <Field label="Decision rationale">
+                            <textarea
+                              required
+                              minLength={5}
+                              maxLength={2000}
+                              value={reason}
+                              onChange={(e) => setReason(e.target.value)}
+                            />
+                          </Field>
+                          <label className="check">
+                            <input
+                              type="checkbox"
+                              required
+                              checked={confirmed}
+                              onChange={(e) => setConfirmed(e.target.checked)}
+                            />
+                            I have reviewed the evidence. This decision closes
+                            the case.
+                          </label>
+                          <button type="submit">Record final decision</button>
+                        </fieldset>
+                        {(data.active_call ||
+                          data.unfinished_approved_actions > 0) && (
+                          <p className="muted">
+                            Complete supervisor review, finish active calls and
+                            wait for approved actions before closing this case.
+                          </p>
+                        )}
+                      </form>
+                    ) : (
+                      <p>
+                        Awaiting the supervisor’s final decision. Analysts
+                        submit recommendations in the Actions tab.
+                      </p>
+                    )}
+                  </div>
+                </Panel>
+              )}
+            </div>
+            <div>
+              <Panel title="Transaction details">
+                <div className="panel-body">
+                  <dl className="detail-list">
+                    <dt>Transaction</dt>
+                    <dd>{c.external_id}</dd>
+                    <dt>Amount</dt>
+                    <dd>{money(c.amount_minor, c.currency)}</dd>
+                    <dt>Occurred</dt>
+                    <dd>{date(data.transaction.occurred_at)}</dd>
+                    <dt>Processing</dt>
+                    <dd>
+                      <Badge value={data.transaction.status} />
+                    </dd>
+                    <dt>Review reason</dt>
+                    <dd>{label(c.review_reason)}</dd>
+                  </dl>
+                  <ReadableEvidence value={data.transaction.context} />
+                  {!identity.booth_mode && (
+                    <details style={{ margin: "16px 0 0" }}>
+                      <summary>Full transaction record (raw JSON)</summary>
+                      <pre className="json-payload">
+                        {JSON.stringify(data.transaction, null, 2)}
+                      </pre>
+                    </details>
+                  )}
+                </div>
+              </Panel>
+              {identity.role === "supervisor" && open && (
+                <Panel title="Assign analyst">
                   <form
+                    className="panel-body"
                     onSubmit={(e) => {
                       e.preventDefault();
-                      action.run(
-                        () =>
-                          mutate("/cases/" + id + "/decisions", {
-                            ...version,
-                            disposition,
-                            reason,
-                          }),
-                        "Final decision recorded.",
+                      action.run(() =>
+                        mutate(
+                          "/cases/" + id + "/assignment",
+                          { ...version, analyst_id: assignee },
+                          "PUT",
+                        ),
                       );
                     }}
                   >
-                    <fieldset
-                      disabled={
-                        action.busy ||
-                        !!data.active_call ||
-                        data.unfinished_approved_actions > 0
-                      }
-                    >
-                      <Field label="Disposition">
+                    <ErrorBox error={analysts.error} />
+                    <fieldset disabled={action.busy}>
+                      <Field label="Analyst">
                         <select
-                          value={disposition}
-                          onChange={(e) => setDisposition(e.target.value)}
+                          required
+                          value={assignee}
+                          onChange={(e) => setAssignee(e.target.value)}
                         >
-                          <option value="INCONCLUSIVE">Inconclusive</option>
-                          <option value="LEGITIMATE">Legitimate</option>
-                          <option value="CONFIRMED_FRAUD">
-                            Confirmed fraud
-                          </option>
+                          <option value="">Select analyst</option>
+                          {analysts.data?.items.map((a) => (
+                            <option key={a.id} value={a.id}>
+                              {short(a.id)}
+                            </option>
+                          ))}
                         </select>
                       </Field>
-                      <Field label="Decision rationale">
+                      <button>Assign case</button>
+                    </fieldset>
+                  </form>
+                </Panel>
+              )}
+            </div>
+          </div>
+        )}
+        {tab === "Evidence" && (
+          <Evidence id={id} revision={rev} transaction={data.transaction} />
+        )}
+        {tab === "Notes & findings" && (
+          <div className="case-columns">
+            <Panel title="Case notes">
+              <div className="panel-body">
+                {write && open && (
+                  <form
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      if (
+                        await action.run(() =>
+                          mutate("/cases/" + id + "/notes", {
+                            ...version,
+                            text: note,
+                          }),
+                        )
+                      )
+                        setNote("");
+                    }}
+                  >
+                    <fieldset disabled={action.busy}>
+                      <Field label="Add a note">
+                        <textarea
+                          minLength={5}
+                          maxLength={2000}
+                          required
+                          value={note}
+                          onChange={(e) => setNote(e.target.value)}
+                        />
+                      </Field>
+                      <button>Add note</button>
+                    </fieldset>
+                  </form>
+                )}
+                <Collection<Note>
+                  path={"/cases/" + id + "/notes"}
+                  revision={rev}
+                  render={(items) =>
+                    items.length ? (
+                      items.map((n) => (
+                        <article className="note" key={n.id}>
+                          <p>{n.text}</p>
+                          <small>
+                            {date(n.created_at)} by {short(n.author_id)}
+                          </small>
+                        </article>
+                      ))
+                    ) : (
+                      <Empty title="No notes yet" />
+                    )
+                  }
+                />
+              </div>
+            </Panel>
+            <Panel title="Investigation findings">
+              <div className="panel-body">
+                {write && open && (
+                  <form
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      if (
+                        await action.run(() =>
+                          mutate("/cases/" + id + "/findings", {
+                            ...version,
+                            category,
+                            summary: finding,
+                            recommendation,
+                          }),
+                        )
+                      )
+                        setFinding("");
+                    }}
+                  >
+                    <fieldset disabled={action.busy}>
+                      <Field label="Category">
+                        <select
+                          value={category}
+                          onChange={(e) => setCategory(e.target.value)}
+                        >
+                          {[
+                            "TRANSACTION_PATTERN",
+                            "ACCOUNT_HISTORY",
+                            "CUSTOMER_CONTACT",
+                            "OTHER",
+                          ].map((x) => (
+                            <option key={x} value={x}>
+                              {label(x)}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
+                      <Field label="Finding">
                         <textarea
                           required
                           minLength={5}
                           maxLength={2000}
-                          value={reason}
-                          onChange={(e) => setReason(e.target.value)}
+                          value={finding}
+                          onChange={(e) => setFinding(e.target.value)}
                         />
                       </Field>
-                      <label className="check">
-                        <input
-                          type="checkbox"
-                          required
-                          checked={confirmed}
-                          onChange={(e) => setConfirmed(e.target.checked)}
-                        />
-                        I have reviewed the evidence. This decision closes the
-                        case.
-                      </label>
-                      <button type="submit">Record final decision</button>
+                      <Field label="Recommendation">
+                        <select
+                          value={recommendation}
+                          onChange={(e) => setRecommendation(e.target.value)}
+                        >
+                          {[
+                            "REVIEW",
+                            "CONTACT_CUSTOMER",
+                            "PROPOSE_ACTION",
+                            "NO_ACTION",
+                          ].map((x) => (
+                            <option key={x} value={x}>
+                              {label(x)}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
+                      <button>Record finding</button>
                     </fieldset>
-                    {(data.active_call ||
-                      data.unfinished_approved_actions > 0) && (
-                      <p className="muted">
-                        Finish the active call and approved actions before
-                        closing this case.
-                      </p>
-                    )}
                   </form>
-                ) : (
-                  <p>No final decision has been recorded.</p>
                 )}
+                <Collection<Event>
+                  path={"/cases/" + id + "/findings"}
+                  revision={rev}
+                  render={(items) =>
+                    items.length ? (
+                      items.map((f) => (
+                        <article className="note" key={f.id}>
+                          <Details value={f.details} />
+                          <small>{date(f.created_at)}</small>
+                        </article>
+                      ))
+                    ) : (
+                      <Empty title="No findings yet" />
+                    )
+                  }
+                />
               </div>
             </Panel>
           </div>
-          <div>
-            <Panel title="Transaction details">
+        )}
+        {tab === "Calls" && (
+          <div
+            className={identity.booth_mode ? "call-workspace" : "case-columns"}
+          >
+            <Panel title="Customer contact" aside={<Phone size={18} />}>
               <div className="panel-body">
-                <dl className="detail-list">
-                  <dt>Transaction</dt>
-                  <dd>{c.external_id}</dd>
-                  <dt>Amount</dt>
-                  <dd>{money(c.amount_minor, c.currency)}</dd>
-                  <dt>Occurred</dt>
-                  <dd>{date(data.transaction.occurred_at)}</dd>
-                  <dt>Processing</dt>
-                  <dd>
-                    <Badge value={data.transaction.status} />
-                  </dd>
-                  <dt>Review reason</dt>
-                  <dd>{label(c.review_reason)}</dd>
-                </dl>
-                <Details value={data.transaction.context} />
-                {!identity.booth_mode && (
-                  <details style={{ margin: "16px 0 0" }}>
-                    <summary>Full transaction record (raw JSON)</summary>
-                    <pre className="json-payload">
-                      {JSON.stringify(data.transaction, null, 2)}
-                    </pre>
-                  </details>
+                {write && open && !data.active_call && (
+                  <form
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      await action.run(
+                        async () => {
+                          const call = await api<Call>(
+                            "/cases/" + id + "/calls",
+                            {
+                              method: "POST",
+                              body: {
+                                ...version,
+                                participant_id: participant,
+                                language,
+                              },
+                            },
+                          );
+                          setCallId(call.id);
+                        },
+                        identity.booth_mode
+                          ? "Calling the account holder. Accept the call below."
+                          : "Verification call created. The customer can answer in their workspace.",
+                      );
+                    }}
+                  >
+                    <ErrorBox error={participants.error} />
+                    <fieldset
+                      disabled={
+                        action.busy || data.investigation?.state !== "ACTIVE"
+                      }
+                    >
+                      <Field
+                        label={
+                          identity.booth_mode
+                            ? "Customer contact"
+                            : "Customer participant"
+                        }
+                      >
+                        <select
+                          required
+                          value={participant}
+                          onChange={(e) => setParticipant(e.target.value)}
+                        >
+                          <option value="">Select contact</option>
+                          {participants.data?.items.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {identity.booth_mode
+                                ? "Account holder"
+                                : short(p.id)}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
+                      <Field label="Call language">
+                        <select
+                          value={language}
+                          onChange={(e) => setLanguage(e.target.value)}
+                        >
+                          <option value="en">English</option>
+                          <option value="ar">العربية</option>
+                        </select>
+                      </Field>
+                      <button>Create verification call</button>
+                    </fieldset>
+                    {data.investigation?.state !== "ACTIVE" && (
+                      <p className="muted">
+                        Start or resume the investigation first.
+                      </p>
+                    )}
+                  </form>
                 )}
+                <Collection<Call>
+                  path={"/cases/" + id + "/calls"}
+                  revision={rev}
+                  render={(items) =>
+                    items.map((c) => (
+                      <button
+                        className="inbox-item"
+                        key={c.id}
+                        onClick={() => setCallId(c.id)}
+                      >
+                        <span>
+                          {short(c.id)} ({c.language.toUpperCase()})
+                        </span>
+                        <Badge value={c.state} />
+                      </button>
+                    ))
+                  }
+                />
               </div>
             </Panel>
-            {identity.role === "supervisor" && open && (
-              <Panel title="Assign analyst">
+            {callId || data.active_call?.id ? (
+              <CallPanel
+                key={callId || data.active_call!.id}
+                callId={callId || data.active_call!.id}
+                identity={identity}
+                onChange={refresh}
+              />
+            ) : (
+              <Empty title="Select a verification call">
+                Calls and replies are simulated and recorded as evidence.
+              </Empty>
+            )}
+          </div>
+        )}
+        {tab === "Actions" && (
+          <div className="case-columns">
+            <Panel title="Action proposals">
+              <div className="panel-body">
+                <section className="recommendation-summary">
+                  <h3>Investigation summary</h3>
+                  <p>
+                    {money(c.amount_minor, c.currency)} · {c.account_id} ·{" "}
+                    {label(c.severity)} priority
+                  </p>
+                  {latestAI && (
+                    <p>
+                      <strong>AI summary:</strong>{" "}
+                      {String(
+                        latestAI.details.summary ?? "Assessment recorded",
+                      )}
+                    </p>
+                  )}
+                </section>
+                <p className="muted">
+                  Actions are simulated. An approval does not move money or
+                  contact a real bank.
+                </p>
+                <Collection<Proposal>
+                  path={"/cases/" + id + "/action-proposals"}
+                  revision={rev}
+                  render={(items) =>
+                    items.length ? (
+                      items.map((p) => (
+                        <ProposalCard
+                          key={p.id + "-" + p.version + "-" + rev}
+                          p={p}
+                          identity={identity}
+                          onChange={refresh}
+                          currentVersion={c.version}
+                          onResubmit={() => {
+                            setProposal(p.action);
+                            setReason(p.reason);
+                            setTab("Actions");
+                          }}
+                        />
+                      ))
+                    ) : (
+                      <Empty title="No proposed actions" />
+                    )
+                  }
+                />
+              </div>
+            </Panel>
+            {identity.role === "analyst" && open && (
+              <Panel title="Submit your recommendation">
                 <form
                   className="panel-body"
                   onSubmit={(e) => {
                     e.preventDefault();
-                    action.run(() =>
-                      mutate(
-                        "/cases/" + id + "/assignment",
-                        { ...version, analyst_id: assignee },
-                        "PUT",
-                      ),
+                    action.run(
+                      () =>
+                        mutate("/cases/" + id + "/action-proposals", {
+                          ...version,
+                          action: proposal,
+                          reason,
+                        }),
+                      "Proposal submitted for independent review.",
                     );
                   }}
                 >
-                  <ErrorBox error={analysts.error} />
-                  <fieldset disabled={action.busy}>
-                    <Field label="Analyst">
+                  <p>
+                    Supervisor review is required for every recommendation,
+                    including no action.
+                  </p>
+                  {data.investigation?.state !== "ACTIVE" && (
+                    <p className="notice warning">
+                      Begin or resume the investigation in Overview before
+                      submitting your recommendation.
+                    </p>
+                  )}
+                  {data.pending_proposals > 0 && (
+                    <p className="notice">
+                      Your recommendation is awaiting supervisor review. It will
+                      not expire automatically.
+                    </p>
+                  )}
+                  <fieldset
+                    disabled={
+                      action.busy ||
+                      data.investigation?.state !== "ACTIVE" ||
+                      data.pending_proposals > 0 ||
+                      !!data.active_call ||
+                      data.unfinished_approved_actions > 0
+                    }
+                  >
+                    <Field label="Recommended action">
                       <select
-                        required
-                        value={assignee}
-                        onChange={(e) => setAssignee(e.target.value)}
-                      >
-                        <option value="">Select analyst</option>
-                        {analysts.data?.items.map((a) => (
-                          <option key={a.id} value={a.id}>
-                            {short(a.id)}
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
-                    <button>Assign case</button>
-                  </fieldset>
-                </form>
-              </Panel>
-            )}
-          </div>
-        </div>
-      )}
-      {tab === "Evidence" && (
-        <Evidence id={id} revision={rev} transaction={data.transaction} />
-      )}
-      {tab === "Notes & findings" && (
-        <div className="case-columns">
-          <Panel title="Case notes">
-            <div className="panel-body">
-              {write && open && (
-                <form
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    if (
-                      await action.run(() =>
-                        mutate("/cases/" + id + "/notes", {
-                          ...version,
-                          text: note,
-                        }),
-                      )
-                    )
-                      setNote("");
-                  }}
-                >
-                  <fieldset disabled={action.busy}>
-                    <Field label="Add a note">
-                      <textarea
-                        minLength={5}
-                        maxLength={2000}
-                        required
-                        value={note}
-                        onChange={(e) => setNote(e.target.value)}
-                      />
-                    </Field>
-                    <button>Add note</button>
-                  </fieldset>
-                </form>
-              )}
-              <Collection<Note>
-                path={"/cases/" + id + "/notes"}
-                revision={rev}
-                render={(items) =>
-                  items.length ? (
-                    items.map((n) => (
-                      <article className="note" key={n.id}>
-                        <p>{n.text}</p>
-                        <small>
-                          {date(n.created_at)} by {short(n.author_id)}
-                        </small>
-                      </article>
-                    ))
-                  ) : (
-                    <Empty title="No notes yet" />
-                  )
-                }
-              />
-            </div>
-          </Panel>
-          <Panel title="Investigation findings">
-            <div className="panel-body">
-              {write && open && (
-                <form
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    if (
-                      await action.run(() =>
-                        mutate("/cases/" + id + "/findings", {
-                          ...version,
-                          category,
-                          summary: finding,
-                          recommendation,
-                        }),
-                      )
-                    )
-                      setFinding("");
-                  }}
-                >
-                  <fieldset disabled={action.busy}>
-                    <Field label="Category">
-                      <select
-                        value={category}
-                        onChange={(e) => setCategory(e.target.value)}
+                        value={proposal}
+                        onChange={(e) => setProposal(e.target.value)}
                       >
                         {[
-                          "TRANSACTION_PATTERN",
-                          "ACCOUNT_HISTORY",
-                          "CUSTOMER_CONTACT",
-                          "OTHER",
-                        ].map((x) => (
-                          <option key={x} value={x}>
-                            {label(x)}
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
-                    <Field label="Finding">
-                      <textarea
-                        required
-                        minLength={5}
-                        maxLength={2000}
-                        value={finding}
-                        onChange={(e) => setFinding(e.target.value)}
-                      />
-                    </Field>
-                    <Field label="Recommendation">
-                      <select
-                        value={recommendation}
-                        onChange={(e) => setRecommendation(e.target.value)}
-                      >
-                        {[
-                          "REVIEW",
-                          "CONTACT_CUSTOMER",
-                          "PROPOSE_ACTION",
+                          "HOLD_TRANSFER",
+                          "BLOCK_CARD",
+                          "FREEZE_DIGITAL_ACCESS",
+                          "FREEZE_ACCOUNT",
+                          "STEP_UP_AUTH",
                           "NO_ACTION",
                         ].map((x) => (
                           <option key={x} value={x}>
@@ -718,253 +1031,48 @@ export default function CaseWorkspace({
                         ))}
                       </select>
                     </Field>
-                    <button>Record finding</button>
-                  </fieldset>
-                </form>
-              )}
-              <Collection<Event>
-                path={"/cases/" + id + "/findings"}
-                revision={rev}
-                render={(items) =>
-                  items.length ? (
-                    items.map((f) => (
-                      <article className="note" key={f.id}>
-                        <Details value={f.details} />
-                        <small>{date(f.created_at)}</small>
-                      </article>
-                    ))
-                  ) : (
-                    <Empty title="No findings yet" />
-                  )
-                }
-              />
-            </div>
-          </Panel>
-        </div>
-      )}
-      {tab === "Calls" && (
-        <div
-          className={identity.booth_mode ? "call-workspace" : "case-columns"}
-        >
-          <Panel title="Customer contact" aside={<Phone size={18} />}>
-            <div className="panel-body">
-              {write && open && !data.active_call && (
-                <form
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    await action.run(
-                      async () => {
-                        const call = await api<Call>(
-                          "/cases/" + id + "/calls",
-                          {
-                            method: "POST",
-                            body: {
-                              ...version,
-                              participant_id: participant,
-                              language,
-                            },
-                          },
-                        );
-                        setCallId(call.id);
-                      },
-                      identity.booth_mode
-                        ? "Calling the account holder. Accept the call below."
-                        : "Verification call created. The customer can answer in their workspace.",
-                    );
-                  }}
-                >
-                  <ErrorBox error={participants.error} />
-                  <fieldset
-                    disabled={
-                      action.busy || data.investigation?.state !== "ACTIVE"
-                    }
-                  >
-                    <Field
-                      label={
-                        identity.booth_mode
-                          ? "Customer contact"
-                          : "Customer participant"
-                      }
-                    >
-                      <select
+                    <Field label="Reason and supporting evidence">
+                      <textarea
                         required
-                        value={participant}
-                        onChange={(e) => setParticipant(e.target.value)}
-                      >
-                        <option value="">Select contact</option>
-                        {participants.data?.items.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {identity.booth_mode
-                              ? "Account holder"
-                              : short(p.id)}
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
-                    <Field label="Call language">
-                      <select
-                        value={language}
-                        onChange={(e) => setLanguage(e.target.value)}
-                      >
-                        <option value="en">English</option>
-                        <option value="ar">العربية</option>
-                      </select>
-                    </Field>
-                    <button>Create verification call</button>
-                  </fieldset>
-                  {data.investigation?.state !== "ACTIVE" && (
-                    <p className="muted">
-                      Start or resume the investigation first.
-                    </p>
-                  )}
-                </form>
-              )}
-              <Collection<Call>
-                path={"/cases/" + id + "/calls"}
-                revision={rev}
-                render={(items) =>
-                  items.map((c) => (
-                    <button
-                      className="inbox-item"
-                      key={c.id}
-                      onClick={() => setCallId(c.id)}
-                    >
-                      <span>
-                        {short(c.id)} ({c.language.toUpperCase()})
-                      </span>
-                      <Badge value={c.state} />
-                    </button>
-                  ))
-                }
-              />
-            </div>
-          </Panel>
-          {callId || data.active_call?.id ? (
-            <CallPanel
-              key={callId || data.active_call!.id}
-              callId={callId || data.active_call!.id}
-              identity={identity}
-              onChange={refresh}
-            />
-          ) : (
-            <Empty title="Select a verification call">
-              Calls and replies are simulated and recorded as evidence.
-            </Empty>
-          )}
-        </div>
-      )}
-      {tab === "Actions" && (
-        <div className="case-columns">
-          <Panel title="Action proposals">
-            <div className="panel-body">
-              <p className="muted">
-                Actions are simulated. An approval does not move money or
-                contact a real bank.
-              </p>
-              <Collection<Proposal>
-                path={"/cases/" + id + "/action-proposals"}
-                revision={rev}
-                render={(items) =>
-                  items.length ? (
-                    items.map((p) => (
-                      <ProposalCard
-                        key={p.id + "-" + p.version + "-" + rev}
-                        p={p}
-                        identity={identity}
-                        onChange={refresh}
+                        minLength={5}
+                        maxLength={2000}
+                        value={reason}
+                        onChange={(e) => setReason(e.target.value)}
                       />
-                    ))
-                  ) : (
-                    <Empty title="No proposed actions" />
-                  )
-                }
+                    </Field>
+                    <button>Submit to supervisor</button>
+                  </fieldset>
+                  <p className="muted">
+                    Finish active calls first. The backend binds the action to
+                    this transaction and the current evidence.
+                  </p>
+                </form>
+              </Panel>
+            )}
+          </div>
+        )}
+        {tab === "Timeline" && (
+          <Panel title="Case activity">
+            <div className="panel-body">
+              <Collection<Event>
+                path={"/cases/" + id + "/events"}
+                revision={rev}
+                render={(items) => (
+                  <ol className="timeline">
+                    {items.map((e) => (
+                      <li key={e.id}>
+                        <strong>{label(e.kind.replaceAll(".", "_"))}</strong>
+                        <small>{date(e.created_at)}</small>
+                        <Details value={e.details} />
+                      </li>
+                    ))}
+                  </ol>
+                )}
               />
             </div>
           </Panel>
-          {write && open && (
-            <Panel title="Propose an action">
-              <form
-                className="panel-body"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  action.run(
-                    () =>
-                      mutate("/cases/" + id + "/action-proposals", {
-                        ...version,
-                        action: proposal,
-                        reason,
-                      }),
-                    "Proposal submitted for independent review.",
-                  );
-                }}
-              >
-                <fieldset
-                  disabled={
-                    action.busy ||
-                    !!data.active_call ||
-                    data.unfinished_approved_actions > 0
-                  }
-                >
-                  <Field label="Action">
-                    <select
-                      value={proposal}
-                      onChange={(e) => setProposal(e.target.value)}
-                    >
-                      {[
-                        "HOLD_TRANSFER",
-                        "BLOCK_CARD",
-                        "FREEZE_DIGITAL_ACCESS",
-                        "FREEZE_ACCOUNT",
-                        "STEP_UP_AUTH",
-                        "NO_ACTION",
-                      ].map((x) => (
-                        <option key={x} value={x}>
-                          {label(x)}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field label="Reason and supporting evidence">
-                    <textarea
-                      required
-                      minLength={5}
-                      maxLength={2000}
-                      value={reason}
-                      onChange={(e) => setReason(e.target.value)}
-                    />
-                  </Field>
-                  <button>Submit proposal</button>
-                </fieldset>
-                <p className="muted">
-                  Finish active calls first. The backend binds the action to
-                  this transaction and the current evidence.
-                </p>
-              </form>
-            </Panel>
-          )}
-        </div>
-      )}
-      {tab === "Timeline" && (
-        <Panel title="Case activity">
-          <div className="panel-body">
-            <Collection<Event>
-              path={"/cases/" + id + "/events"}
-              revision={rev}
-              render={(items) => (
-                <ol className="timeline">
-                  {items.map((e) => (
-                    <li key={e.id}>
-                      <strong>{label(e.kind.replaceAll(".", "_"))}</strong>
-                      <small>{date(e.created_at)}</small>
-                      <Details value={e.details} />
-                    </li>
-                  ))}
-                </ol>
-              )}
-            />
-          </div>
-        </Panel>
-      )}
+        )}
+      </div>
     </>
   );
 }
@@ -999,7 +1107,12 @@ function Evidence({
                 Evidence available at {date(evidence.data?.as_of)}. Later
                 transactions are excluded.
               </p>
-              {evidence.data?.history.map((t) => (
+              {!evidence.data?.history?.length && !evidence.error && (
+                <p>
+                  No earlier payments were recorded in this evidence snapshot.
+                </p>
+              )}
+              {evidence.data?.history?.map((t) => (
                 <div className="history-row" key={t.id}>
                   <div>
                     <strong>{t.external_id}</strong>
@@ -1032,19 +1145,13 @@ function Evidence({
       <div>
         <Panel title="Scoring evidence">
           <div className="panel-body">
-            {transaction.result ? (
-              <Details value={transaction.result} />
-            ) : (
-              <p>
-                No scoring result is available. Continue with manual evidence.
-              </p>
-            )}
+            <ScoringEvidence transaction={transaction} />
           </div>
         </Panel>
         <Panel title="Feature snapshot">
           <div className="panel-body">
             {transaction.features ? (
-              <Details value={transaction.features} />
+              <ReadableEvidence value={transaction.features} />
             ) : (
               <p>No feature snapshot has been recorded.</p>
             )}

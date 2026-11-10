@@ -8,7 +8,7 @@ from uuid import UUID, uuid4
 import pytest
 from sqlalchemy import func, select, text
 from sqlalchemy.exc import DBAPIError, IntegrityError, ProgrammingError
-from test_workflows import case_for, post, submit
+from test_workflows import approve_no_action, case_for, post, propose_after_review, submit
 
 from atm_backend.adapters import DisabledScorer, Score
 from atm_backend.features import build_features
@@ -173,7 +173,7 @@ def test_unavailable_scoring_is_a_complete_manual_review_workflow(env, transacti
     summary = get(env, f"cases/{cid}/summary")
     assert summary["counts"]["findings"] == 1 and summary["decision"] is None
     assert summary["pending_proposals"] == 0  # Customer speech never approves a bank action.
-    proposal = post(
+    proposal = propose_after_review(
         env,
         f"cases/{cid}/action-proposals",
         {
@@ -205,6 +205,7 @@ def test_unavailable_scoring_is_a_complete_manual_review_workflow(env, transacti
             "disposition": "CONFIRMED_FRAUD",
             "reason": "Evidence and recorded customer denial reviewed",
         },
+        who="supervisor",
     )
     assert decision.status_code == 201, decision.text
     assert get(env, "dashboard")["decisions"]["CONFIRMED_FRAUD"] == 1
@@ -339,6 +340,7 @@ def test_finding_references_and_audit_export_are_protected(env, transaction_body
 
 def test_training_cancellation_preserves_snapshot_and_prevents_completion(env, transaction_body):
     cid = case_for(env, transaction_body)
+    approve_no_action(env, cid)
     post(
         env,
         f"cases/{cid}/decisions",
@@ -347,6 +349,7 @@ def test_training_cancellation_preserves_snapshot_and_prevents_completion(env, t
             "disposition": "LEGITIMATE",
             "reason": "Reviewed synthetic transfer",
         },
+        who="supervisor",
     )
     training = post(env, "training-jobs", {}, "supervisor").json()
     tid = training["id"]
@@ -450,7 +453,7 @@ def test_card_action_targets_only_the_transaction_card(env, transaction_body):
     cid = case_for(
         env, {**transaction_body, "channel": "CARD", "context": {"card_id": "synthetic-card-1"}}
     )
-    response = post(
+    response = propose_after_review(
         env,
         f"cases/{cid}/action-proposals",
         {"expected_version": 1, "action": "BLOCK_CARD", "reason": "Review matching card only"},
@@ -459,7 +462,7 @@ def test_card_action_targets_only_the_transaction_card(env, transaction_body):
     assert response.json()["target"] == "synthetic-card-1"
     no_card = case_for(env, {**transaction_body, "external_id": str(uuid4()), "channel": "CARD"})
     assert (
-        post(
+        propose_after_review(
             env,
             f"cases/{no_card}/action-proposals",
             {

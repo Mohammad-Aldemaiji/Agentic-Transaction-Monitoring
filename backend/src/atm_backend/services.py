@@ -382,6 +382,13 @@ def propose(s: Session, a: Actor, case_id: UUID, body: dto.ProposalInput) -> Pro
         if transaction.channel not in ("CARD", "ATM") or not transaction.context.get("card_id"):
             raise Problem(422, "card_target_required")
         target = transaction.context["card_id"]
+    active = s.scalar(select(Investigation).where(Investigation.case_id == case.id))
+    if not active or active.state != "ACTIVE":
+        raise Problem(409, "investigation_required")
+    if s.scalar(
+        select(Proposal.id).where(Proposal.case_id == case.id, Proposal.state == "PENDING").limit(1)
+    ):
+        raise Problem(409, "pending_proposals")
     proposal = Proposal(
         case_id=case.id,
         proposer_id=a.id,
@@ -389,7 +396,7 @@ def propose(s: Session, a: Actor, case_id: UUID, body: dto.ProposalInput) -> Pro
         target=target,
         reason=body.reason,
         evidence_version=case.version,
-        expires_at=now() + timedelta(minutes=10),
+        expires_at=None,
     )
     s.add(proposal)
     s.flush()
@@ -401,6 +408,7 @@ def propose(s: Session, a: Actor, case_id: UUID, body: dto.ProposalInput) -> Pro
 def approve(
     s: Session, a: Actor, proposal_id: UUID, body: dto.ApprovalInput, settings: Settings
 ) -> Proposal:
+    a.require("supervisor")
     proposal = s.get(Proposal, proposal_id)
     if not proposal:
         raise Problem(404, "not_found")
@@ -409,7 +417,7 @@ def approve(
     open_case(case)
     no_live_call(s, case)
     version(proposal.version, body.expected_version)
-    if proposal.state != "PENDING" or proposal.expires_at <= now():
+    if proposal.state != "PENDING":
         raise Problem(409, "proposal_not_pending")
     if body.approved and proposal.evidence_version != case.version:
         raise Problem(409, "evidence_changed")
@@ -417,10 +425,8 @@ def approve(
         no_unfinished_action(s, case)
     if (now() - a.auth_time).total_seconds() > settings.approval_auth_age_seconds:
         raise Problem(403, "fresh_authentication_required")
-    if body.approved and proposal.action in HIGH_IMPACT:
-        a.require("supervisor")
-        if proposal.proposer_id == a.id:
-            raise Problem(403, "independent_approval_required")
+    if proposal.proposer_id == a.id:
+        raise Problem(403, "independent_approval_required")
     proposal.state = "APPROVED" if body.approved else "REJECTED"
     proposal.approver_id = a.id
     proposal.version += 1
@@ -458,19 +464,28 @@ def cancel_action(
 
 
 def decide(s: Session, a: Actor, case_id: UUID, body: dto.DecisionInput) -> Decision:
+    a.require("supervisor")
     case = case_access(s, a, case_id, write=True)
     open_case(case)
     version(case.version, body.expected_version)
     no_unfinished_action(s, case)
     no_live_call(s, case)
     if s.scalar(
-        select(Proposal.id)
-        .where(
-            Proposal.case_id == case.id, Proposal.state == "PENDING", Proposal.expires_at > now()
-        )
-        .limit(1)
+        select(Proposal.id).where(Proposal.case_id == case.id, Proposal.state == "PENDING").limit(1)
     ):
         raise Problem(409, "pending_proposals")
+    reviewed = s.scalar(
+        select(Proposal)
+        .where(Proposal.case_id == case.id)
+        .order_by(Proposal.created_at.desc())
+        .limit(1)
+    )
+    if not reviewed or reviewed.state not in ("APPROVED", "REJECTED"):
+        raise Problem(409, "supervisor_review_required")
+    if reviewed.proposer_id == a.id:
+        raise Problem(403, "independent_approval_required")
+    if reviewed.evidence_version != case.version:
+        raise Problem(409, "evidence_changed")
     row = Decision(
         case_id=case.id, reviewer_id=a.id, disposition=body.disposition, reason=body.reason
     )
@@ -592,3 +607,78 @@ def verify_customer(s: Session, a: Actor, call_id: UUID, body: dto.VerificationI
     )
     audit(s, a, "call.verification_recorded", call.id)
     return call
+
+
+GUIDED_STEPS = ("overview", "scoring", "assessment", "verification")
+
+
+def investigation_progress(s: Session, case: Case) -> dict[str, Any]:
+    rows = s.scalars(
+        select(Event)
+        .where(Event.case_id == case.id, Event.kind == "investigation.step_completed")
+        .order_by(Event.id)
+    )
+    return {
+        row.details["step"]: {**row.details, "created_at": row.created_at}
+        for row in rows
+        if row.details.get("step") in GUIDED_STEPS
+    }
+
+
+def complete_step(
+    s: Session, a: Actor, case_id: UUID, body: dto.InvestigationStepInput
+) -> dict[str, Any]:
+    case = case_access(s, a, case_id, write=True)
+    open_case(case)
+    version(case.version, body.expected_version)
+    investigation = s.scalar(select(Investigation).where(Investigation.case_id == case.id))
+    if not investigation or investigation.state != "ACTIVE":
+        raise Problem(409, "investigation_required")
+    allowed_outcomes = {
+        "overview": ("REVIEWED",),
+        "scoring": ("REVIEWED",),
+        "assessment": ("REVIEWED", "MANUAL_REVIEW"),
+        "verification": ("REVIEWED", "NOT_REQUIRED"),
+    }
+    if body.outcome not in allowed_outcomes[body.step]:
+        raise Problem(422, "invalid_step_outcome")
+    progress = investigation_progress(s, case)
+    if any(step not in progress for step in GUIDED_STEPS[: GUIDED_STEPS.index(body.step)]):
+        raise Problem(409, "previous_step_required")
+    if body.step == "assessment" and body.outcome == "REVIEWED":
+        assessment = s.scalar(
+            select(Event)
+            .where(
+                Event.case_id == case.id,
+                Event.kind == "investigation.finding",
+                Event.details["source"].as_string() == "local_llm",
+            )
+            .order_by(Event.id.desc())
+            .limit(1)
+        )
+        if not assessment or assessment.details.get("evidence_version") != case.version:
+            raise Problem(409, "current_assessment_required")
+    if body.step == "verification":
+        no_live_call(s, case)
+        if body.outcome == "REVIEWED" and not s.scalar(
+            select(Call.id)
+            .join(Investigation)
+            .where(
+                Investigation.case_id == case.id, Call.state.in_(("ENDED", "DECLINED", "TIMED_OUT"))
+            )
+            .limit(1)
+        ):
+            raise Problem(409, "verification_outcome_required")
+    event(
+        s,
+        case,
+        "investigation.step_completed",
+        step=body.step,
+        outcome=body.outcome,
+        reason=body.reason,
+        reviewer_id=str(a.id),
+        evidence_version=case.version,
+    )
+    audit(s, a, "investigation.step_completed", case.id)
+    s.flush()
+    return investigation_progress(s, case)

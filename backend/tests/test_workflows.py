@@ -38,6 +38,64 @@ def post(env, path, body, who="analyst"):
     return env["client"].post("/api/v1/" + path, json=body, headers=env["headers"](who))
 
 
+def propose_after_review(env, path, body, who="analyst"):
+    """Fixture: the proposal tests start from a completed analyst review.
+
+    Keep the case version fixed so these tests can target concurrency and action
+    integrity. test_guided_investigation exercises each review through the API.
+    """
+    from atm_backend.models import Event, Investigation
+
+    cid = UUID(path.split("/")[1])
+    with env["factory"].begin() as session:
+        case = session.get(Case, cid)
+        if case:
+            investigation = session.scalar(
+                select(Investigation).where(Investigation.case_id == cid)
+            )
+            if not investigation:
+                session.add(Investigation(case_id=cid))
+            for step in ("overview", "scoring", "assessment", "verification"):
+                session.add(
+                    Event(
+                        case_id=cid,
+                        kind="investigation.step_completed",
+                        details={
+                            "step": step,
+                            "reason": "Completed synthetic evidence review",
+                            "outcome": "REVIEWED",
+                            "evidence_version": case.version,
+                        },
+                    )
+                )
+    return post(env, path, body, who)
+
+
+def approve_no_action(env, cid):
+    p = propose_after_review(
+        env,
+        f"cases/{cid}/action-proposals",
+        {
+            "expected_version": get_case(env, cid)["version"],
+            "action": "NO_ACTION",
+            "reason": "Synthetic reviewed evidence supports no action",
+        },
+    ).json()
+    assert (
+        post(
+            env,
+            f"action-proposals/{p['id']}/approval",
+            {
+                "expected_version": 1,
+                "approved": True,
+            },
+            "supervisor",
+        ).status_code
+        == 200
+    )
+    assert run_one(env["runtime"], SimulationScorer())
+
+
 def test_idempotency_atomicity_and_concurrent_duplicates(env, transaction_body):
     with ThreadPoolExecutor(max_workers=4) as pool:
         responses = list(pool.map(lambda _: submit(env, transaction_body), range(4)))
@@ -176,7 +234,7 @@ def test_complete_call_approval_decision_scenario(env, transaction_body, languag
         == 409
     )
     assert (
-        post(
+        propose_after_review(
             env,
             f"cases/{cid}/action-proposals",
             {
@@ -205,7 +263,7 @@ def test_complete_call_approval_decision_scenario(env, transaction_body, languag
         ).status_code
         == 409
     )
-    proposal = post(
+    proposal = propose_after_review(
         env,
         f"cases/{cid}/action-proposals",
         {
@@ -232,6 +290,7 @@ def test_complete_call_approval_decision_scenario(env, transaction_body, languag
                 "disposition": "CONFIRMED_FRAUD",
                 "reason": "Reviewed synthetic evidence",
             },
+            who="supervisor",
         ).status_code
         == 201
     )
@@ -250,7 +309,7 @@ def test_complete_call_approval_decision_scenario(env, transaction_body, languag
 @pytest.mark.parametrize("value", ["false", "no", 1, 0, None, [], {}])
 def test_approval_never_coerces_truthiness(env, transaction_body, value):
     cid = case_for(env, transaction_body)
-    proposal = post(
+    proposal = propose_after_review(
         env,
         f"cases/{cid}/action-proposals",
         {"expected_version": 1, "action": "NO_ACTION", "reason": "Test approval strictness"},
@@ -268,7 +327,7 @@ def test_approval_never_coerces_truthiness(env, transaction_body, value):
 
 def test_evidence_changes_invalidate_approval(env, transaction_body):
     cid = case_for(env, transaction_body)
-    proposal = post(
+    proposal = propose_after_review(
         env,
         f"cases/{cid}/action-proposals",
         {"expected_version": 1, "action": "NO_ACTION", "reason": "Proposed before new evidence"},
@@ -294,7 +353,7 @@ def test_evidence_changes_invalidate_approval(env, transaction_body):
 
 def test_independent_and_fresh_approval(env, transaction_body):
     cid = case_for(env, transaction_body)
-    proposal = post(
+    proposal = propose_after_review(
         env,
         f"cases/{cid}/action-proposals",
         {
