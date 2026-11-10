@@ -1,7 +1,7 @@
 from datetime import timedelta
 
 from sqlalchemy import select
-from test_workflows import case_for, post
+from test_workflows import approve_no_action, case_for, post
 
 from atm_backend.adapters import SimulationScorer
 from atm_backend.models import BrowserSession, now
@@ -95,6 +95,7 @@ def test_policy_requires_independent_recent_supervisor(env):
 
 def test_reviewed_snapshot_model_review_and_drift(env, transaction_body):
     cid = case_for(env, transaction_body)
+    approve_no_action(env, cid)
     assert (
         post(
             env,
@@ -104,6 +105,7 @@ def test_reviewed_snapshot_model_review_and_drift(env, transaction_body):
                 "disposition": "LEGITIMATE",
                 "reason": "Synthetic legitimate reviewed example",
             },
+            who="supervisor",
         ).status_code
         == 201
     )

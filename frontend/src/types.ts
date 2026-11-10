@@ -64,7 +64,8 @@ export interface Proposal {
   evidence_version: number;
   proposer_id: string;
   approver_id: string | null;
-  expires_at: string;
+  created_at?: string;
+  expires_at: string | null;
 }
 export interface Summary {
   local_agent_enabled?: boolean;

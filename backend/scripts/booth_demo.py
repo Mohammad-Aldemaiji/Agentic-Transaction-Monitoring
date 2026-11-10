@@ -162,6 +162,7 @@ def initialize(values, cfg):
     with engine.begin() as c:
         c.execute(text("CREATE SCHEMA IF NOT EXISTS atm_booth"))
         Base.metadata.create_all(c)
+        c.execute(text("ALTER TABLE atm_booth.proposals ALTER COLUMN expires_at DROP NOT NULL"))
         from atm_backend.staff_access import StaffBase
 
         StaffBase.metadata.create_all(c)

@@ -258,31 +258,6 @@ def expire_waits(factory: sessionmaker[Session]) -> None:
                 case.version += 1
                 event(s, case, "call.timed_out", call_id=str(call.id))
                 worker_audit(s, case.team, "call.timed_out", call.id)
-        expired_cases = s.scalars(
-            select(Case)
-            .where(
-                Case.id.in_(
-                    select(Proposal.case_id).where(
-                        Proposal.state == "PENDING", Proposal.expires_at <= now()
-                    )
-                )
-            )
-            .order_by(Case.id)
-            .with_for_update(skip_locked=True)
-            .limit(100)
-        )
-        for case in expired_cases:
-            for proposal in s.scalars(
-                select(Proposal).where(
-                    Proposal.case_id == case.id,
-                    Proposal.state == "PENDING",
-                    Proposal.expires_at <= now(),
-                )
-            ):
-                proposal.state = "EXPIRED"
-                proposal.version += 1
-                event(s, case, "action.expired", proposal_id=str(proposal.id))
-                worker_audit(s, case.team, "action.expired", proposal.id)
         s.execute(
             delete(BrowserSession).where(BrowserSession.expires_at < now() - timedelta(days=1))
         )

@@ -455,6 +455,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise Problem(404, "not_found")
         return views.fields(row, "id", "case_id", "state", "version")
 
+    @app.get("/api/v1/cases/{case_id}/investigation-progress")
+    def investigation_progress(case_id: UUID, s: DB, a: Identity) -> dict[str, Any]:
+        case = svc.case_access(s, a, case_id)
+        return svc.investigation_progress(s, case)
+
+    @app.post("/api/v1/cases/{case_id}/investigation-progress")
+    def complete_step(
+        case_id: UUID, body: dto.InvestigationStepInput, s: DB, a: Identity
+    ) -> dict[str, Any]:
+        return svc.complete_step(s, a, case_id, body)
+
     @app.post("/api/v1/cases/{case_id}/calls", status_code=201)
     def create_call(case_id: UUID, body: dto.CallInput, s: DB, a: Identity) -> dict[str, Any]:
         return views.call(svc.create_call(s, a, case_id, body, cfg))

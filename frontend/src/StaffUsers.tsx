@@ -156,148 +156,163 @@ export default function StaffUsers({ enabled }: { enabled: boolean }) {
       <p>User invitations are available in the configured staff workspace.</p>
     );
   return (
-    <section className="panel">
-      <h1>Users</h1>
-      <p>
-        Invite staff to their assigned role. Passwords are set privately by each
-        user.
-      </p>
-      <p>
-        Your own account is protected here. Another administrator must manage
-        your access.
-      </p>
-      <ErrorBox error={error} />
-      {message && <p role="status">{message}</p>}
-      <form onSubmit={invite}>
-        <fieldset disabled={busy}>
-          <Field label="Full name">
-            <input
-              required
-              maxLength={100}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </Field>
-          <Field label="Work email">
-            <input
-              type="email"
-              required
-              maxLength={254}
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </Field>
-          <Field label="Role">
-            <select
-              value={role}
-              onChange={(e) => setRole(e.target.value as StaffRole)}
-            >
-              <option value="analyst">Analyst</option>
-              <option value="supervisor">Supervisor</option>
-              <option value="admin">Administrator</option>
-            </select>
-          </Field>
-          <button type="submit">
-            {busy ? "Sending…" : "Create user and send invitation"}
-          </button>
-        </fieldset>
-      </form>
-      <button
-        className="secondary"
-        disabled={busy}
-        onClick={() => refresh().catch(setError)}
+    <section className="panel staff-users">
+      <div className="panel-heading">
+        <h1>Users</h1>
+      </div>
+      <div className="panel-body">
+        <p>
+          Invite staff to their assigned role. Passwords are set privately by
+          each user.
+        </p>
+        <p>
+          Your own account is protected here. Another administrator must manage
+          your access.
+        </p>
+        <ErrorBox error={error} />
+        {message && <p role="status">{message}</p>}
+        <form onSubmit={invite}>
+          <fieldset disabled={busy}>
+            <Field label="Full name">
+              <input
+                required
+                maxLength={100}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </Field>
+            <Field label="Work email">
+              <input
+                type="email"
+                required
+                maxLength={254}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </Field>
+            <Field label="Role">
+              <select
+                value={role}
+                onChange={(e) => setRole(e.target.value as StaffRole)}
+              >
+                <option value="analyst">Analyst</option>
+                <option value="supervisor">Supervisor</option>
+                <option value="admin">Administrator</option>
+              </select>
+            </Field>
+            <div className="button-row">
+              <button type="submit">
+                {busy ? "Sending…" : "Create user and send invitation"}
+              </button>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => refresh().catch(setError)}
+              >
+                Refresh users
+              </button>
+            </div>
+          </fieldset>
+        </form>
+      </div>
+      <div
+        className="table-wrap staff-users-table"
+        role="region"
+        aria-label="Staff users"
+        tabIndex={0}
       >
-        Refresh users
-      </button>
-      <table>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Email</th>
-            <th>Role</th>
-            <th>Access</th>
-            <th>Face sign-in</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {users.map((user) => (
-            <tr key={user.id}>
-              <td>
-                {user.name}
-                {user.is_self && <small> (Your account)</small>}
-              </td>
-              <td>{user.email}</td>
-              <td>
-                <select
-                  aria-label={`Role for ${user.email}`}
-                  disabled={busy || user.is_self || user.active === null}
-                  value={user.role}
-                  onChange={(e) =>
-                    change(
-                      user,
-                      user.active === true,
-                      e.target.value as StaffRole,
-                    )
-                  }
-                >
-                  <option value="analyst">Analyst</option>
-                  <option value="supervisor">Supervisor</option>
-                  <option value="admin">Administrator</option>
-                </select>
-              </td>
-              <td>
-                {user.active === null
-                  ? "Invitation pending — delivery/access not confirmed"
-                  : user.active
-                    ? "Enabled"
-                    : "Disabled"}
-              </td>
-              <td>{user.face_enrolled ? "Set up" : "Not set up"}</td>
-              <td>
-                {user.active === null && (
-                  <button
-                    disabled={busy || user.is_self}
-                    onClick={() => retry(user)}
-                  >
-                    Retry invitation
-                  </button>
-                )}
-                {user.active !== null && (
-                  <button
-                    disabled={busy || user.is_self}
-                    onClick={() => change(user, !user.active, user.role)}
-                  >
-                    {user.active ? "Disable" : "Enable"}
-                  </button>
-                )}
-                {user.active === true && (
-                  <button
-                    disabled={busy || user.is_self}
-                    onClick={() => resetPassword(user)}
-                  >
-                    Send password reset link
-                  </button>
-                )}
-                {user.face_enrolled && (
-                  <button
-                    disabled={busy || user.is_self}
-                    onClick={() => resetFace(user)}
-                  >
-                    Reset face sign-in
-                  </button>
-                )}
-                <button
-                  disabled={busy || user.is_self}
-                  onClick={() => remove(user)}
-                >
-                  Delete user
-                </button>
-              </td>
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Access</th>
+              <th>Face sign-in</th>
+              <th>Action</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {users.map((user) => (
+              <tr key={user.id}>
+                <td>
+                  {user.name}
+                  {user.is_self && <small> (Your account)</small>}
+                </td>
+                <td>{user.email}</td>
+                <td>
+                  <select
+                    aria-label={`Role for ${user.email}`}
+                    disabled={busy || user.is_self || user.active === null}
+                    value={user.role}
+                    onChange={(e) =>
+                      change(
+                        user,
+                        user.active === true,
+                        e.target.value as StaffRole,
+                      )
+                    }
+                  >
+                    <option value="analyst">Analyst</option>
+                    <option value="supervisor">Supervisor</option>
+                    <option value="admin">Administrator</option>
+                  </select>
+                </td>
+                <td>
+                  {user.active === null
+                    ? "Invitation pending — delivery/access not confirmed"
+                    : user.active
+                      ? "Enabled"
+                      : "Disabled"}
+                </td>
+                <td>{user.face_enrolled ? "Set up" : "Not set up"}</td>
+                <td className="staff-user-actions-cell">
+                  <div className="staff-user-actions">
+                    {user.active === null && (
+                      <button
+                        disabled={busy || user.is_self}
+                        onClick={() => retry(user)}
+                      >
+                        Retry invitation
+                      </button>
+                    )}
+                    {user.active !== null && (
+                      <button
+                        disabled={busy || user.is_self}
+                        onClick={() => change(user, !user.active, user.role)}
+                      >
+                        {user.active ? "Disable" : "Enable"}
+                      </button>
+                    )}
+                    {user.active === true && (
+                      <button
+                        disabled={busy || user.is_self}
+                        onClick={() => resetPassword(user)}
+                      >
+                        Send password reset link
+                      </button>
+                    )}
+                    {user.face_enrolled && (
+                      <button
+                        disabled={busy || user.is_self}
+                        onClick={() => resetFace(user)}
+                      >
+                        Reset face sign-in
+                      </button>
+                    )}
+                    <button
+                      disabled={busy || user.is_self}
+                      onClick={() => remove(user)}
+                    >
+                      Delete user
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }

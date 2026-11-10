@@ -1,7 +1,7 @@
 """A declined call and rejected proposal must not strand a case or execute an action."""
 
 from sqlalchemy import func, select
-from test_workflows import case_for, get_case, post
+from test_workflows import case_for, get_case, post, propose_after_review
 
 from atm_backend.adapters import SimulationScorer
 from atm_backend.models import Audit, Execution, Job
@@ -49,7 +49,7 @@ def test_declined_call_and_rejected_action_allow_reviewed_resolution(env, transa
         ).status_code
         == 409
     )
-    proposal = post(
+    proposal = propose_after_review(
         env,
         f"cases/{cid}/action-proposals",
         {
@@ -95,6 +95,7 @@ def test_declined_call_and_rejected_action_allow_reviewed_resolution(env, transa
             "disposition": "LEGITIMATE",
             "reason": "Reviewed independent synthetic evidence; declined call is inconclusive",
         },
+        who="supervisor",
     )
     assert decision.status_code == 201
     assert get_case(env, cid)["state"] == "RESOLVED"
